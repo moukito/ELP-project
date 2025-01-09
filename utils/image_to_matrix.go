@@ -10,9 +10,9 @@ import (
 
 func ImageToMatrix(imagePath string) ([][][4]uint8, error) {
 	// Ouvrir le fichier image
-	file, err := os.Open(imagePath) // Remplacez "image.jpg" par le chemin de votre image
+	file, err := os.Open(imagePath)
 	if err != nil {
-		return nil, fmt.Errorf("Erreur lors de l'ouverture de l'image : %w", err)
+		return nil, fmt.Errorf("erreur lors de l'ouverture de l'image : %w", err)
 	}
 	defer file.Close()
 

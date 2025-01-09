@@ -5,7 +5,7 @@ import (
 )
 
 // generateGaussianKernel crée un noyau gaussien 2D.
-func generateGaussianKernel(size int, sigma float64) [][]float64 {
+func GenerateGaussianKernel(size int, sigma float64) [][]float64 {
 	kernel := make([][]float64, size)
 	sum := 0.0
 	radius := size / 2
