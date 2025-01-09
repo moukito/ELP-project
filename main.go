@@ -1,10 +1,13 @@
 package main
 
-import "fmt"
+import (
+	"ELP-project/utils"
+	"fmt"
+)
 
 func main() {
 	imagePath := "image.png"
-	matrix, err := image_to_matrix(imagePath)
+	matrix, err := utils.ImageToMatrix(imagePath)
 	if err != nil {
 		fmt.Println("Erreur :", err)
 		return
