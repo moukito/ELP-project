@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"fmt"
@@ -39,16 +39,4 @@ func image_to_matrix(imagePath string) ([][][4]uint8, error) {
 	}
 
 	return matrix, nil
-}
-
-func main() {
-	imagePath := "image.png"
-	matrix, err := image_to_matrix(imagePath)
-	if err != nil {
-		fmt.Println("Erreur :", err)
-		return
-	}
-	for x := 0; x < 5; x++ {
-		fmt.Printf("Pixel (%d, %d): %v\n", x, 0, matrix[0][x])
-	}
 }
