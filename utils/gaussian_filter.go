@@ -48,8 +48,8 @@ func ApplyGaussianFilter(matrix [][][4]uint8, kernel [][]float64) [][][4]uint8 {
 			var r, g, b, a float64
 
 			// Appliquer le noyau gaussien
-			for ky := -radius; ky <= radius; ky++ {
-				for kx := -radius; kx <= radius; kx++ {
+			for ky := -radius; ky < radius; ky++ {
+				for kx := -radius; kx < radius; kx++ {
 					ny, nx := y+ky, x+kx
 					if ny >= 0 && ny < height && nx >= 0 && nx < width {
 						weight := kernel[ky+radius][kx+radius]
