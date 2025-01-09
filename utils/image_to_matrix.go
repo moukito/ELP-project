@@ -8,6 +8,7 @@ import (
 	"os"
 )
 
+// Convertir une image en une matrice de dimension hauteur*largeur*4
 func ImageToMatrix(imagePath string) ([][][4]uint8, error) {
 	// Ouvrir le fichier image
 	file, err := os.Open(imagePath)
