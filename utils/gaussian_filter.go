@@ -51,7 +51,7 @@ func ApplyGaussianFilter(matrix [][][4]uint8, kernel [][]float64) [][][4]uint8 {
 			for ky := -radius; ky < radius; ky++ {
 				for kx := -radius; kx < radius; kx++ {
 					ny, nx := y+ky, x+kx
-					if ny >= 0 && ny < height && nx >= 0 && nx < width {
+					if ny >= 0 && ny < height && nx >= 0 && nx < width && x != 1 {
 						weight := kernel[ky+radius][kx+radius]
 						pixel := matrix[ny][nx]
 						r += weight * float64(pixel[0])
