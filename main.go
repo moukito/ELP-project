@@ -1,28 +1,43 @@
 package main
 
 import (
+	"ELP-project/imageUtils"
 	"ELP-project/utils"
 	"fmt"
+	"log"
 )
 
+// Main Canny filter pipeline.
 func main() {
-	imagePath := "image.png"
-	matrix, err := utils.ImageToMatrix(imagePath)
+	// Input/output paths
+	inputPath := "input.png"
+	outputPath := "output.png"
+
+	// Load image
+	img, format, err := imageUtils.LoadImage(inputPath)
 	if err != nil {
-		fmt.Println("Erreur :", err)
-		return
-	}
-	for x := 0; x < 5; x++ {
-		fmt.Printf("Pixel (%d, %d): %v\n", x, 0, matrix[0][x])
+		log.Fatalf("Failed to load input image: %v", err)
 	}
 
-	kernel := utils.GenerateGaussianKernel(2, 1.0)
-	fmt.Printf("Pixel (%d, %d): %v\n", 0, 0, kernel[0][0])
-	fmt.Printf("Pixel (%d, %d): %v\n", 0, 1, kernel[0][1])
-	fmt.Printf("Pixel (%d, %d): %v\n", 1, 0, kernel[1][0])
-	fmt.Printf("Pixel (%d, %d): %v\n", 1, 1, kernel[1][1])
-	result := utils.ApplyGaussianFilter(matrix, kernel)
-	fmt.Printf("Pixel (%d, %d): %v\n", 5, 0, result[5][10])
+	// Convert to grayscale
+	grayImg := imageUtils.Grayscale(img)
 
-	utils.SaveImage(utils.MatrixToImage(result), "output.png")
+	// Customize Gaussian kernel
+	kernelSize := 5
+	kernelSigma := 1.4
+	gaussianKernel := utils.GenerateGaussianKernel(kernelSize, kernelSigma)
+
+	// Apply Gaussian blur
+	blurredImg := utils.ApplyKernel(grayImg, gaussianKernel)
+
+	// Apply Sobel edge detection
+	edges, _ := utils.ApplySobelEdgeDetection(blurredImg)
+
+	// Save the result
+	err = imageUtils.SaveImage(edges, outputPath, format)
+	if err != nil {
+		log.Fatalf("Failed to save output image: %v", err)
+	}
+
+	fmt.Println("Canny filter applied and output saved to", outputPath)
 }
