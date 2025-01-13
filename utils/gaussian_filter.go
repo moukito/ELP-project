@@ -1,11 +1,17 @@
 package utils
 
 import (
+	"image"
+	"image/color"
 	"math"
 )
 
-// GenerateGaussianKernel crée un noyau gaussien 2D.
+// GenerateGaussianKernel dynamically creates a Gaussian kernel of any size and sigma.
 func GenerateGaussianKernel(size int, sigma float64) [][]float64 {
+	if size%2 == 0 {
+		panic("Gaussian kernel size must be odd")
+	}
+
 	kernel := make([][]float64, size)
 	sum := 0.0
 	radius := size / 2
@@ -19,7 +25,7 @@ func GenerateGaussianKernel(size int, sigma float64) [][]float64 {
 		}
 	}
 
-	// Normaliser le noyau pour que la somme = 1
+	// Normalize the kernel
 	for i := 0; i < size; i++ {
 		for j := 0; j < size; j++ {
 			kernel[i][j] /= sum
@@ -29,43 +35,34 @@ func GenerateGaussianKernel(size int, sigma float64) [][]float64 {
 	return kernel
 }
 
-// ApplyGaussianFilter applique un filtre gaussien à une matrice RGBA.
-func ApplyGaussianFilter(matrix [][][4]uint8, kernel [][]float64) [][][4]uint8 {
-	height := len(matrix)
-	width := len(matrix[0])
+// ApplyKernel applies a convolution kernel to a grayscale image (e.g., Gaussian blur or Sobel).
+func ApplyKernel(img *image.Gray, kernel [][]float64) *image.Gray {
+	bounds := img.Bounds()
+	output := image.NewGray(bounds)
 	radius := len(kernel) / 2
 
-	// Créer une matrice pour le résultat
-	result := make([][][4]uint8, height)
-	for i := range result {
-		result[i] = make([][4]uint8, width)
-	}
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			var sum float64
+			var weightSum float64
 
-	// Parcourir chaque pixel
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			// Variables pour accumuler les valeurs RGB
-			var r, g, b, a float64
-
-			// Appliquer le noyau gaussien
-			for ky := -radius; ky < radius; ky++ {
-				for kx := -radius; kx < radius; kx++ {
-					ny, nx := y+ky, x+kx
-					if ny >= 0 && ny < height && nx >= 0 && nx < width && x != 1 {
-						weight := kernel[ky+radius][kx+radius]
-						pixel := matrix[ny][nx]
-						r += weight * float64(pixel[0])
-						g += weight * float64(pixel[1])
-						b += weight * float64(pixel[2])
-						a += weight * float64(pixel[3])
+			// Apply kernel around the pixel
+			for ky := -radius; ky <= radius; ky++ {
+				for kx := -radius; kx <= radius; kx++ {
+					pixelX := x + kx
+					pixelY := y + ky
+					if pixelX >= bounds.Min.X && pixelX < bounds.Max.X && pixelY >= bounds.Min.Y && pixelY < bounds.Max.Y {
+						gray := float64(img.GrayAt(pixelX, pixelY).Y)
+						sum += gray * kernel[ky+radius][kx+radius]
+						weightSum += kernel[ky+radius][kx+radius]
 					}
 				}
 			}
 
-			// Stocker le résultat
-			result[y][x] = [4]uint8{uint8(r), uint8(g), uint8(b), uint8(a)}
+			// Store the result
+			output.SetGray(x, y, color.Gray{Y: uint8(sum / weightSum)})
 		}
 	}
 
-	return result
+	return output
 }
