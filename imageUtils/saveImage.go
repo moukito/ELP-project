@@ -12,10 +12,16 @@ import (
 // SaveImage saves an image to a file in the specified format.
 func SaveImage(img image.Image, filePath string, format string) error {
 	file, err := os.Create(filePath)
+
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			panic(err)
+		}
+	}(file)
 
 	switch strings.ToLower(format) {
 	case "jpg", "jpeg":
