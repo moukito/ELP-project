@@ -1,5 +1,6 @@
 *.img
 *.png
 *.jpg
+*.jpeg
 build
 .idea

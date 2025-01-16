@@ -2,6 +2,7 @@ package main
 
 import (
 	"ELP-project/imageUtils"
+	"ELP-project/server"
 	"ELP-project/utils"
 	"fmt"
 	"log"
@@ -40,4 +41,10 @@ func main() {
 	}
 
 	fmt.Println("Canny filter applied and output saved to", outputPath)
+
+	server := server.New(&server.Config{
+		Host: "localhost",
+		Port: "3333",
+	})
+	server.Run()
 }
