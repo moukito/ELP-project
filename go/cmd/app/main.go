@@ -23,8 +23,8 @@ func main() {
 	grayImg := imageUtils.Grayscale(img)
 
 	// Customize Gaussian kernel
-	kernelSize := 5
-	kernelSigma := 1.4
+	kernelSize := 15
+	kernelSigma := float64(kernelSize) / 6
 	gaussianKernel := utils.GenerateGaussianKernel(kernelSize, kernelSigma)
 
 	// Apply Gaussian blur
