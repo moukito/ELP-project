@@ -8,6 +8,7 @@ import (
 
 const bufferSize = 1024
 
+// todo: put this in an other file
 func OpenFile(path string) *os.File {
 	file, err := os.Open(path)
 	if err != nil {
@@ -18,6 +19,7 @@ func OpenFile(path string) *os.File {
 	return file
 }
 
+// todo: put this in an other file
 func Connector(network string, address string) net.Conn {
 	conn, err := net.Dial(network, address)
 	if err != nil {
