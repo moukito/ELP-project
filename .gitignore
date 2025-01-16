@@ -2,5 +2,6 @@
 *.png
 *.jpg
 *.jpeg
-build
+bin
 .idea
+*.log

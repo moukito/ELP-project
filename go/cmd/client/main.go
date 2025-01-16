@@ -2,85 +2,136 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"os"
 )
 
 const bufferSize = 1024
 
-// todo: put this in an other file
-func OpenFile(path string) *os.File {
-	file, err := os.Open(path)
+// Client is a struct that encapsulates the functionality for sending files over a TCP connection.
+type Client struct {
+	host string
+	port string
+}
+
+// NewClient creates a new Client instance with the given image file path and server address.
+func NewClient(host string, port string) *Client {
+	return &Client{
+		host: host,
+		port: port,
+	}
+}
+
+// OpenFile opens the given file and returns a pointer to os.File.
+func OpenFile(imageFilePath string) *os.File {
+	file, err := os.Open(imageFilePath)
 	if err != nil {
-		fmt.Println("Error opening image file:", err)
-		os.Exit(1)
+		log.Fatalf("error opening image file: %v", err)
 	}
 
 	return file
 }
 
-// todo: put this in an other file
-func Connector(network string, address string) net.Conn {
-	conn, err := net.Dial(network, address)
+// connect establishes a TCP connection to the server.
+func (client *Client) connect() net.Conn {
+	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", client.host, client.port))
 	if err != nil {
-		fmt.Println("Error connecting to server:", err)
-		os.Exit(2)
+		log.Fatalf("error connecting to server: %v", err)
 	}
 
 	return conn
 }
 
-func sendImage(conn net.Conn, file *os.File, buffer []byte) {
+// sendImage sends the image file to the server using the given connection.
+func (client *Client) sendImage(file *os.File, conn net.Conn) {
+	buffer := make([]byte, bufferSize)
+
 	for {
 		n, err := file.Read(buffer)
-		if err != nil {
-			break
-		}
 		if n > 0 {
-			_, err = conn.Write(buffer[:n])
-			if err != nil {
-				fmt.Println("Error sending data:", err)
-				os.Exit(3)
+			_, writeErr := conn.Write(buffer[:n])
+			if writeErr != nil {
+				log.Fatalf("Error sending data: %v", writeErr)
 			}
+		}
+
+		if err != nil {
+			if err.Error() == "EOF" {
+				break
+			}
+			log.Fatalf("Error reading file: %v", err)
 		}
 	}
 }
 
-// main initializes the process of reading an image file and sending it over a TCP connection to a server.
-func main() {
-	args := os.Args
-
-	if len(args) < 3 {
-		fmt.Println("Usage: ./client <image_file_path> <server_address>")
-		return
-	}
-
-	imageFilePath := args[1]
-	serverAddress := args[2]
-
-	// Open the image file
-	imageFile := OpenFile(imageFilePath)
-	defer func(imageFile *os.File) {
-		err := imageFile.Close()
+// Run executes the workflow of the client: opening a file, connecting, and sending the file.
+func (client *Client) Run(imageFilePath string) {
+	// Open image file
+	file := OpenFile(imageFilePath)
+	log.Printf("Image file opened: %s", file.Name())
+	defer func(file *os.File) {
+		err := file.Close()
 		if err != nil {
-			fmt.Println("Error closing image file:", err)
-			os.Exit(1)
+			log.Fatalf("Error closing file: %v", err)
 		}
-	}(imageFile)
+	}(file)
 
-	// Open the tcp connection
-	conn := Connector("tcp", serverAddress)
+	// Connect to server
+	conn := client.connect()
+	log.Printf("Connected to server: %s", conn.RemoteAddr().String())
 	defer func(conn net.Conn) {
 		err := conn.Close()
 		if err != nil {
-			fmt.Println("Error closing connection:", err)
-			os.Exit(2)
+			log.Fatalf("Error closing connection: %v", err)
 		}
 	}(conn)
 
-	buffer := make([]byte, bufferSize) // Buffer to hold chunks of the file
+	log.Println("Sending image...")
+	client.sendImage(file, conn)
+	log.Println("Image sent successfully!")
+}
 
-	fmt.Println("Sending image...")
-	sendImage(conn, imageFile, buffer)
-	fmt.Println("Image sent successfully!")
+// main initializes the process of reading an image file and sending it over a TCP connection to a server.
+func main() {
+	// Open a file for logging
+	logFile, err := os.OpenFile("client.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
+	if err != nil {
+		log.Fatalf("Failed to open log file: %v", err)
+	}
+	defer func(logFile *os.File) {
+		err := logFile.Close()
+		if err != nil {
+			log.Fatalf("Error closing log file: %v", err)
+		}
+	}(logFile)
+
+	// Set the output of the default logger to the file
+	log.SetOutput(logFile)
+
+	args := os.Args
+
+	if len(args) > 3 || len(args) < 2 {
+		fmt.Println("Usage: ./client <image_file_path> <server_address>")
+		log.Fatal("Invalid number of arguments")
+	}
+
+	imageFilePath := args[1]
+	log.Printf("Image file path: %s", imageFilePath)
+
+	host := "localhost"
+	port := "14750"
+	if len(args) == 3 {
+		tmpHost, tmpPort, err := net.SplitHostPort(args[2])
+		if err != nil {
+			log.Fatalf("Invalid server address format: %v", err)
+		}
+		host = tmpHost
+		port = tmpPort
+	}
+	log.Printf("Server address: %s:%s", host, port)
+
+	// Create and run the client
+	client := NewClient(host, port)
+	client.Run(imageFilePath)
 }
