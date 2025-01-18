@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -85,11 +84,6 @@ func (client *Client) receiveImage(conn net.Conn, file *os.File) {
 		_, writeErr := file.Write(buffer[:n])
 		if writeErr != nil {
 			log.Fatalf("Error writing to file: %v", writeErr)
-		}
-
-		if bytes.Contains(buffer, []byte("EOF")) {
-			log.Println("End of data detected.")
-			break
 		}
 	}
 }

@@ -135,7 +135,6 @@ func (server *Server) sendImage(conn net.Conn, img image.Image, format string) {
 		// Advance the sent position
 		sent += n
 	}
-	//conn.Write([]byte("EOF"))
 
 	log.Printf("Image sent successfully. Total bytes: %d", dataLen)
 }
@@ -151,23 +150,18 @@ func (server *Server) run() {
 
 	for {
 		conn, err := listener.Accept()
+		// todo : workers
 		if err != nil {
 			log.Println("Error accepting connection:", err)
 		}
-		defer conn.Close()
-
-		//file, err := CreateFile("received_image.jpg")
-		//if err != nil {
-		//	log.Println("Error creating file:", err)
-		//}
-		//defer file.Close()
-		//defer os.Remove("received_image.jpg")
 
 		log.Println("Receiving image...")
 		img, format := server.receiveImage(conn)
+		log.Println("Image received successfully!")
 
 		// todo : treat the image
 
+		log.Println("Sending image...")
 		server.sendImage(conn, img, format)
 
 		conn.Close()
