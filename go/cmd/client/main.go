@@ -1,13 +1,20 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 )
 
-const bufferSize = 1024
+const (
+	defaultHost = "localhost"
+	defaultPort = "14750"
+	bufferSize  = 1024
+)
 
 // Client is a struct that encapsulates the functionality for sending files over a TCP connection.
 type Client struct {
@@ -21,16 +28,6 @@ func NewClient(host string, port string) *Client {
 		host: host,
 		port: port,
 	}
-}
-
-// OpenFile opens the given file and returns a pointer to os.File.
-func OpenFile(imageFilePath string) *os.File {
-	file, err := os.Open(imageFilePath)
-	if err != nil {
-		log.Fatalf("error opening image file: %v", err)
-	}
-
-	return file
 }
 
 // connect establishes a TCP connection to the server.
@@ -63,12 +60,47 @@ func (client *Client) sendImage(file *os.File, conn net.Conn) {
 			log.Fatalf("Error reading file: %v", err)
 		}
 	}
+	_, err := conn.Write([]byte("EOF"))
+	if err != nil {
+		log.Fatalf("Error sending EOF: %v", err)
+	}
+}
+
+func (client *Client) receiveImage(conn net.Conn, file *os.File) {
+	// Create a buffer to store the incoming data
+	buffer := make([]byte, bufferSize) // Temporary buffer size for chunks
+
+	for {
+		// Read incoming data into the temporary buffer
+		n, err := conn.Read(buffer)
+		if err != nil {
+			if err.Error() == "EOF" || err == io.EOF {
+				// End of data, break the loop
+				break
+			}
+			// Handle unexpected errors
+			log.Fatalf("Error reading from connection: %v", err)
+		}
+
+		_, writeErr := file.Write(buffer[:n])
+		if writeErr != nil {
+			log.Fatalf("Error writing to file: %v", writeErr)
+		}
+
+		if bytes.Contains(buffer, []byte("EOF")) {
+			log.Println("End of data detected.")
+			break
+		}
+	}
 }
 
 // Run executes the workflow of the client: opening a file, connecting, and sending the file.
 func (client *Client) Run(imageFilePath string) {
 	// Open image file
-	file := OpenFile(imageFilePath)
+	file, err := os.Open(imageFilePath)
+	if err != nil {
+		log.Fatalf("error opening image file: %v", err)
+	}
 	log.Printf("Image file opened: %s", file.Name())
 	defer func(file *os.File) {
 		err := file.Close()
@@ -90,6 +122,20 @@ func (client *Client) Run(imageFilePath string) {
 	log.Println("Sending image...")
 	client.sendImage(file, conn)
 	log.Println("Image sent successfully!")
+
+	newFile, err := os.Create("output_" + filepath.Base(file.Name()))
+	if err != nil {
+		log.Fatalf("Error creating output file: %v", err)
+	}
+	defer func(newFile *os.File) {
+		err := newFile.Close()
+		if err != nil {
+			log.Fatalf("Error closing file: %v", err)
+		}
+	}(newFile)
+
+	log.Println("Receiving image...")
+	client.receiveImage(conn, newFile)
 }
 
 // main initializes the process of reading an image file and sending it over a TCP connection to a server.
@@ -119,8 +165,8 @@ func main() {
 	imageFilePath := args[1]
 	log.Printf("Image file path: %s", imageFilePath)
 
-	host := "localhost"
-	port := "14750"
+	host := defaultHost
+	port := defaultPort
 	if len(args) == 3 {
 		tmpHost, tmpPort, err := net.SplitHostPort(args[2])
 		if err != nil {
