@@ -149,25 +149,29 @@ func (server *Server) run() {
 		}
 	}(listener)
 
-	conn, err := listener.Accept()
-	if err != nil {
-		log.Println("Error accepting connection:", err)
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Println("Error accepting connection:", err)
+		}
+		defer conn.Close()
+
+		//file, err := CreateFile("received_image.jpg")
+		//if err != nil {
+		//	log.Println("Error creating file:", err)
+		//}
+		//defer file.Close()
+		//defer os.Remove("received_image.jpg")
+
+		log.Println("Receiving image...")
+		img, format := server.receiveImage(conn)
+
+		// todo : treat the image
+
+		server.sendImage(conn, img, format)
+
+		conn.Close()
 	}
-	defer conn.Close()
-
-	//file, err := CreateFile("received_image.jpg")
-	//if err != nil {
-	//	log.Println("Error creating file:", err)
-	//}
-	//defer file.Close()
-	//defer os.Remove("received_image.jpg")
-
-	log.Println("Receiving image...")
-	img, format := server.receiveImage(conn)
-
-	// todo : treat the image
-
-	server.sendImage(conn, img, format)
 }
 
 func main() {
