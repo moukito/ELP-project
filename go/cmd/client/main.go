@@ -123,7 +123,18 @@ func (client *Client) Run(imageFilePath string) {
 	client.sendImage(file, conn)
 	log.Println("Image sent successfully!")
 
-	newFile, err := os.Create("output_" + filepath.Base(file.Name()))
+	newFileName := "output_" + filepath.Base(file.Name())
+	fileIndex := 1
+	for {
+		if _, err := os.Stat(newFileName); os.IsNotExist(err) {
+			break
+		} else {
+			newFileName = fmt.Sprintf("output_%d_%s", fileIndex, filepath.Base(file.Name()))
+			fileIndex++
+		}
+	}
+
+	newFile, err := os.Create(newFileName)
 	if err != nil {
 		log.Fatalf("Error creating output file: %v", err)
 	}
