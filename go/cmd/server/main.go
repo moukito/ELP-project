@@ -19,28 +19,32 @@ const (
 	bufferSize = 1024
 )
 
+// Server is a struct that encapsulates logic for handling TCP connections.
 type Server struct {
 	host string
 	port string
 }
 
-func NewServer(host string, port string) *Server {
+// newServer create a new server instance
+func newServer(host string, port string) *Server {
 	return &Server{
 		host: host,
 		port: port,
 	}
 }
 
+// listen sets up a server to listen for incoming connections.
 func (server *Server) listen() net.Listener {
 	listener, err := net.Listen(protocol, fmt.Sprintf("%s:%s", server.host, server.port))
 	if err != nil {
 		log.Fatalf("Error starting server: %v", err)
 	}
-	log.Println("Server is listening on port 6666...")
+	log.Printf("Server is listening on IP address %v and port %v...", server.host, server.port)
 
 	return listener
 }
 
+// receiveImage handles receiving an image over a connection.
 func (server *Server) receiveImage(conn net.Conn) (image.Image, string) {
 	// Create a buffer to store the incoming data
 	var dataBuffer bytes.Buffer
@@ -82,6 +86,7 @@ func (server *Server) receiveImage(conn net.Conn) (image.Image, string) {
 	return img, format
 }
 
+// imageToBuffer converts an image into a byte buffer based on the provided format.
 func imageToBuffer(img image.Image, format string) (*bytes.Buffer, error) {
 	// Create a new bytes.Buffer
 	var buffer bytes.Buffer
@@ -106,6 +111,7 @@ func imageToBuffer(img image.Image, format string) (*bytes.Buffer, error) {
 	return &buffer, nil
 }
 
+// sendImage handles sending an image based on its provided format over a connection.
 func (server *Server) sendImage(conn net.Conn, img image.Image, format string) {
 	// Use a buffer to encode the image
 	buffer, err := imageToBuffer(img, format)
@@ -139,6 +145,7 @@ func (server *Server) sendImage(conn net.Conn, img image.Image, format string) {
 	log.Printf("Image sent successfully. Total bytes: %d", dataLen)
 }
 
+// run executes the workflow of the server: listening a file, receiving the file over the connection, treating the image, and sending the image back to client.
 func (server *Server) run() {
 	listener := server.listen()
 	defer func(listener net.Listener) {
@@ -168,6 +175,7 @@ func (server *Server) run() {
 	}
 }
 
+// main initialize the functionality of a TCP server.
 func main() {
 	// Open a file for logging
 	logFile, err := os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
@@ -186,6 +194,6 @@ func main() {
 
 	log.Println("Starting server...")
 
-	server := NewServer(host, port)
+	server := newServer(host, port)
 	server.run()
 }
