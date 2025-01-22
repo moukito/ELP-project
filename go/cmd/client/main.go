@@ -21,8 +21,8 @@ type Client struct {
 	port string
 }
 
-// NewClient creates a new Client instance with the given image file path and server address.
-func NewClient(host string, port string) *Client {
+// newClient creates a new Client instance with the given image file path and server address.
+func newClient(host string, port string) *Client {
 	return &Client{
 		host: host,
 		port: port,
@@ -88,8 +88,8 @@ func (client *Client) receiveImage(conn net.Conn, file *os.File) {
 	}
 }
 
-// Run executes the workflow of the client: opening a file, connecting, and sending the file.
-func (client *Client) Run(imageFilePath string) {
+// run executes the workflow of the client: opening a file, connecting, and sending the file.
+func (client *Client) run(imageFilePath string) {
 	// Open image file
 	file, err := os.Open(imageFilePath)
 	if err != nil {
@@ -183,6 +183,6 @@ func main() {
 	log.Printf("Server address: %s:%s", host, port)
 
 	// Create and run the client
-	client := NewClient(host, port)
-	client.Run(imageFilePath)
+	client := newClient(host, port)
+	client.run(imageFilePath)
 }
