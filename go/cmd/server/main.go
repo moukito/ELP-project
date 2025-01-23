@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"image/draw"
 	"image/jpeg"
 	"image/png"
 	"io"
@@ -14,6 +15,9 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"runtime"
+	"sort"
+	"sync"
 )
 
 const (
@@ -23,30 +27,35 @@ const (
 	bufferSize = 1024
 )
 
+var numWorkers = runtime.NumCPU()
+
 // Server is a struct that encapsulates logic for handling TCP connections.
 type Server struct {
-	host    string
-	port    string
-	stopCtx context.Context
-	cancel  context.CancelFunc
+	host       string
+	port       string
+	stopCtx    context.Context
+	cancel     context.CancelFunc
+	numWorkers int
 }
 
 type Task struct {
 	conn       net.Conn    // Connection to the client
 	img        image.Image // Image received
-	format     string      // Format of the image (e.g., JPEG, PNG)
 	err        error       // Error during processing
 	resultChan chan<- Task
+	function   func(image.Image) (image.Image, error)
+	wg         *sync.WaitGroup
 }
 
 // newServer create a new server instance
-func newServer(host string, port string) *Server {
+func newServer(host string, port string, numWorkers int) *Server {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Server{
-		host:    host,
-		port:    port,
-		stopCtx: ctx,
-		cancel:  cancel,
+		host:       host,
+		port:       port,
+		stopCtx:    ctx,
+		cancel:     cancel,
+		numWorkers: numWorkers,
 	}
 }
 
@@ -71,7 +80,7 @@ func (server *Server) receiveImage(conn net.Conn) (image.Image, string) {
 		// Read incoming data into the temporary buffer
 		n, err := conn.Read(buffer)
 		if err != nil {
-			fmt.Println(err.Error())
+			log.Println(err.Error())
 			if err.Error() == "EOF" || err == io.EOF {
 				// End of data, break the loop
 				break
@@ -195,33 +204,87 @@ func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, 
 		return
 	}
 	log.Println("Image received successfully!")
-
 	// Create a dedicated result channel for this task
-	resultChan := make(chan Task, 1)
+	resultChan := make(chan Task, 100)
+	var wg sync.WaitGroup
+	wg.Add(server.numWorkers)
 
-	// Dispatch task to treatment workers
-	task := Task{
-		conn:       conn,
-		img:        img,
-		format:     format,
-		resultChan: resultChan,
+	// Convert the received image to a concrete type that supports SubImage
+	rgbaImg, ok := img.(*image.RGBA)
+	if !ok {
+		// Convert to RGBA if it's not already in that format
+		bounds := img.Bounds()
+		rgbaImg = image.NewRGBA(bounds)
+		draw.Draw(rgbaImg, bounds, img, bounds.Min, draw.Src)
 	}
-	treatmentChan <- task
 
-	// Wait for the processed result (optional in pipeline logic)
-	log.Printf("Waiting for processing to complete for %s", conn.RemoteAddr())
-	select {
-	case result := <-resultChan: // Get the processed task back (if applicable)
-		if result.err != nil {
-			log.Printf("Error processing image for %s: %v", conn.RemoteAddr(), result.err)
+	// Split the image into row chunks
+	bounds := img.Bounds()
+	totalRows := bounds.Max.Y - bounds.Min.Y
+	chunkSize := (totalRows + server.numWorkers - 1) / server.numWorkers // Rows per worker
+
+	// Dispatch grayscale tasks to treatment workers
+	for i := 0; i < server.numWorkers; i++ {
+		startY := bounds.Min.Y + i*chunkSize
+		endY := startY + chunkSize
+		if endY > bounds.Max.Y {
+			endY = bounds.Max.Y
+		}
+
+		// Define the sub-rectangle for this chunk
+		subBounds := image.Rect(bounds.Min.X, startY, bounds.Max.X, endY)
+
+		// Define a sub-image for the range of rows
+		subImage, ok := rgbaImg.SubImage(subBounds).(*image.RGBA)
+		if !ok {
+			log.Fatalf("SubImage cast failed: expected *image.RGBA")
+		}
+
+		// Create and submit a task for the subimage
+		task := Task{
+			conn:       conn,
+			img:        subImage,
+			wg:         &wg,
+			resultChan: resultChan,
+			function:   imageUtils.GrayscaleWrapper,
+		}
+		treatmentChan <- task
+	}
+
+	// Wait for all results and assemble the final image
+	results := make([]*image.Gray, server.numWorkers)
+	wg.Wait()
+
+	for i := 0; i < server.numWorkers; i++ {
+		select {
+		case result := <-resultChan: // Get the processed task back (if applicable)
+			if result.err != nil {
+				log.Printf("Error processing image for %s: %v", conn.RemoteAddr(), result.err)
+				return
+			}
+			results[i] = result.img.(*image.Gray)
+		case <-server.stopCtx.Done(): // Handle shutdown gracefully
+			log.Println("Server is shutting down, closing connection.")
 			return
 		}
-		log.Printf("Sending processed image back to %s", conn.RemoteAddr())
-		server.sendImage(result.conn, result.img, result.format)
-	case <-server.stopCtx.Done(): // Handle shutdown gracefully
-		log.Println("Server is shutting down, closing connection.")
-		return
 	}
+	close(resultChan)
+
+	// Sort the results by the Y-coordinate (Min.Y) of their bounds
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Rect.Min.Y < results[j].Rect.Min.Y
+	})
+
+	// Assemble the final image from chunks
+	finalImage := image.NewGray(bounds)
+	for i, chunk := range results {
+		startY := bounds.Min.Y + i*chunkSize
+		// Get the height of this specific chunk
+		chunkHeight := chunk.Rect.Dy()
+		draw.Draw(finalImage, image.Rect(bounds.Min.X, startY, bounds.Max.X, startY+chunkHeight), chunk, image.Point{X: bounds.Min.X, Y: startY}, draw.Src)
+	}
+	log.Printf("Sending processed image back to %s", conn.RemoteAddr())
+	server.sendImage(conn, finalImage, format)
 	log.Println("Connection finished:", conn.RemoteAddr())
 }
 
@@ -229,18 +292,28 @@ func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, 
 func (server *Server) treatmentWorker(task Task, _ chan<- Task) {
 	log.Printf("Processing task for connection: %v", task.conn.RemoteAddr())
 
-	// todo : var err error
+	// Ensure a function is assigned to the task
+	if task.function == nil {
+		task.err = errors.New("no processing function provided")
+		if task.resultChan != nil {
+			task.resultChan <- task
+			close(task.resultChan)
+		}
+		log.Printf("No function provided for task from: %v", task.conn.RemoteAddr())
+		return
+	}
 
-	// Todo: Process image here (e.g.: treat it)
-
-	// Simulate image processing (e.g., grayscale conversion, edge detection)
-	processedImg := imageUtils.Grayscale(task.img) // Example: Grayscale conversion
-
-	task.img = processedImg // Store the result in the task
+	// Execute the provided function
+	processedImg, err := task.function(task.img)
+	task.img = processedImg
+	task.err = err
 
 	// Send the processed task to the output channel
 	if task.resultChan != nil {
 		task.resultChan <- task
+	}
+	if task.wg != nil {
+		task.wg.Done()
 	}
 	log.Printf("Task processing completed for connection: %v", task.conn.RemoteAddr())
 }
@@ -258,10 +331,10 @@ func (server *Server) run() {
 
 	// Channels for managing concurrent workers
 	socketSemaphore := make(chan net.Conn, 5) // Limit to 5 concurrent connections
-	treatmentChan := make(chan Task, 10)      // Treatment task channel
+	treatmentChan := make(chan Task, 100)     // Treatment task channel
 
 	// Start worker pools
-	go server.startWorkerPool("Treatment Worker", 10, server.treatmentWorker, treatmentChan, nil)
+	go server.startWorkerPool("Treatment Worker", numWorkers, server.treatmentWorker, treatmentChan, nil)
 
 	// Use a goroutine to listen for server stop signals
 	go func() {
@@ -317,7 +390,7 @@ func main() {
 
 	log.Println("Starting server...")
 
-	server := newServer(host, port)
+	server := newServer(host, port, numWorkers)
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt)
