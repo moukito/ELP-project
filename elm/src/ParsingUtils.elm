@@ -29,14 +29,15 @@ rightParser =
 repeatParser : Parser Instruction
 repeatParser =
     succeed Repeat
-        |= (symbol "Repeat" -- Match "Repeat"
-                |> andThen (\_ -> spaces) -- Skip spaces after "Repeat"
-                |> andThen (\_ -> int) -- Parse the repeat count
+        |= (symbol "Repeat"
+                |> andThen (\_ -> spaces)
+                |> andThen (\_ -> int)
            )
         |= (spaces
-                |> andThen (\_ ->
-                    programParser -- Parse the inner program
-                )
+                |> andThen
+                    (\_ ->
+                        programParser
+                    )
            )
 
 
@@ -65,9 +66,56 @@ programParser =
         , trailing = Parser.Optional
         }
 
+
+
 -- Entry point for parsing
 
 
 read : String -> Result (List Parser.DeadEnd) (List Instruction)
 read input =
     run programParser input
+
+
+
+-- Exemple de test
+-- Fonction pour exécuter une commande
+
+
+executeCommand : Instruction -> String
+executeCommand command =
+    case command of
+        Forward distance ->
+            "Executing Forward with distance: " ++ String.fromInt distance
+
+        Left angle ->
+            "Executing Left with angle: " ++ String.fromInt angle
+
+        Right angle ->
+            "Executing Right with angle: " ++ String.fromInt angle
+
+        Repeat count commands ->
+            String.join "\n"
+                (List.concatMap (\_ -> List.map executeCommand commands) (List.repeat count ()))
+
+
+
+-- Fonction pour exécuter un programme
+
+
+executeProgram : List Instruction -> String
+executeProgram program =
+    String.join "\n" (List.map executeCommand program)
+
+
+
+-- Fonction pour analyser et exécuter le programme
+
+
+processInput : String -> String
+processInput input =
+    case run programParser input of
+        Ok program ->
+            executeProgram program
+
+        Err _ ->
+            "Invalid program"
