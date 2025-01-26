@@ -1,29 +1,73 @@
-module ParsingUtils exposing (read, programParser)
+module ParsingUtils exposing (programParser, read)
 
 import Parser exposing (..)
+import TcTurtle exposing (..)
+
+
 
 -- Parse individual instructions
-instructionParser : Parser Instruction
-instructionParser =
-    oneOf
-        [ map Forward (token "Forward" |> followedBy spaces |> andThen int)
-        , map Left (token "Left" |> followedBy spaces |> andThen int)
-        , map Right (token "Right" |> followedBy spaces |> andThen int)
-        , repeatParser
-        ]
+
+
+forwardParser : Parser Instruction
+forwardParser =
+    succeed Forward
+        |= (symbol "Forward" |> andThen (\_ -> spaces) |> andThen (\_ -> int))
+
+
+leftParser : Parser Instruction
+leftParser =
+    succeed Left
+        |= (symbol "Left" |> andThen (\_ -> spaces) |> andThen (\_ -> int))
+
+
+rightParser : Parser Instruction
+rightParser =
+    succeed Right
+        |= (symbol "Right" |> andThen (\_ -> spaces) |> andThen (\_ -> int))
+
 
 repeatParser : Parser Instruction
 repeatParser =
-    map2 Repeat
-        (token "Repeat" |> followedBy spaces |> andThen int)
-        (inBrackets (separatedBy (symbol ",") instructionParser))
+    succeed Repeat
+        |= (symbol "Repeat" -- Match "Repeat"
+                |> andThen (\_ -> spaces) -- Skip spaces after "Repeat"
+                |> andThen (\_ -> int) -- Parse the repeat count
+           )
+        |= (spaces
+                |> andThen (\_ ->
+                    programParser -- Parse the inner program
+                )
+           )
+
+
+instructionParser : Parser Instruction
+instructionParser =
+    oneOf
+        [ forwardParser
+        , leftParser
+        , rightParser
+        , repeatParser
+        ]
+
+
 
 -- Program parser: Parse entire program
-programParser : Parser Program
+
+
+programParser : Parser (List Instruction)
 programParser =
-    inBrackets (separatedBy (symbol ",") instructionParser)
+    Parser.sequence
+        { start = "["
+        , separator = ","
+        , end = "]"
+        , spaces = spaces
+        , item = instructionParser
+        , trailing = Parser.Optional
+        }
 
 -- Entry point for parsing
-read : String -> Result (List Parser.DeadEnd) Program
+
+
+read : String -> Result (List Parser.DeadEnd) (List Instruction)
 read input =
     run programParser input
