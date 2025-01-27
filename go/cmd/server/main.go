@@ -2,6 +2,7 @@ package main
 
 import (
 	"ELP-project/internal/imageUtils"
+	"ELP-project/internal/utils"
 	"bytes"
 	"context"
 	"errors"
@@ -21,10 +22,11 @@ import (
 )
 
 const (
-	host       = "localhost"
-	port       = "14750"
-	protocol   = "tcp"
-	bufferSize = 1024
+	host        = "localhost"
+	port        = "14750"
+	protocol    = "tcp"
+	bufferSize  = 1024
+	overlapSize = 20
 )
 
 var numWorkers = runtime.NumCPU()
@@ -226,7 +228,12 @@ func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, 
 	// Dispatch grayscale tasks to treatment workers
 	for i := 0; i < server.numWorkers; i++ {
 		startY := bounds.Min.Y + i*chunkSize
-		endY := startY + chunkSize
+		endY := startY + chunkSize + overlapSize
+
+		if startY > overlapSize {
+			startY -= overlapSize
+		}
+
 		if endY > bounds.Max.Y {
 			endY = bounds.Max.Y
 		}
@@ -240,6 +247,7 @@ func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, 
 			log.Fatalf("SubImage cast failed: expected *image.RGBA")
 		}
 
+		wg.Add(1)
 		// Create and submit a task for the subimage
 		task := Task{
 			conn:       conn,
@@ -251,9 +259,54 @@ func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, 
 		treatmentChan <- task
 	}
 
+	resultGrayChan := make(chan Task, 100)
+
+	for i := 0; i < server.numWorkers; i++ {
+		select {
+		case result := <-resultChan: // Get the processed task back (if applicable)
+			if result.err != nil {
+				log.Printf("Error processing image for %s: %v", conn.RemoteAddr(), result.err)
+				return
+			}
+			task := Task{
+				conn:       conn,
+				img:        result.img,
+				wg:         &wg,
+				resultChan: resultGrayChan,
+				function:   utils.ApplyKernelWrapper,
+			}
+			treatmentChan <- task
+		case <-server.stopCtx.Done(): // Handle shutdown gracefully
+			log.Println("Server is shutting down, closing connection.")
+			return
+		}
+	}
+
+	for i := 0; i < server.numWorkers; i++ {
+		select {
+		case result := <-resultGrayChan: // Get the processed task back (if applicable)
+			if result.err != nil {
+				log.Printf("Error processing image for %s: %v", conn.RemoteAddr(), result.err)
+				return
+			}
+			wg.Add(1)
+			task := Task{
+				conn:       conn,
+				img:        result.img,
+				wg:         &wg,
+				resultChan: resultChan,
+				function:   utils.ApplySobelEdgeDetectionWrapper,
+			}
+			treatmentChan <- task
+		case <-server.stopCtx.Done(): // Handle shutdown gracefully
+			log.Println("Server is shutting down, closing connection.")
+			return
+		}
+	}
+
 	// Wait for all results and assemble the final image
 	results := make([]*image.Gray, server.numWorkers)
-	wg.Wait()
+	//wg.Wait()
 
 	for i := 0; i < server.numWorkers; i++ {
 		select {
@@ -280,7 +333,7 @@ func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, 
 	for i, chunk := range results {
 		startY := bounds.Min.Y + i*chunkSize
 		// Get the height of this specific chunk
-		chunkHeight := chunk.Rect.Dy()
+		chunkHeight := chunk.Rect.Dy() - overlapSize
 		draw.Draw(finalImage, image.Rect(bounds.Min.X, startY, bounds.Max.X, startY+chunkHeight), chunk, image.Point{X: bounds.Min.X, Y: startY}, draw.Src)
 	}
 	log.Printf("Sending processed image back to %s", conn.RemoteAddr())
@@ -318,6 +371,8 @@ func (server *Server) treatmentWorker(task Task, _ chan<- Task) {
 	log.Printf("Task processing completed for connection: %v", task.conn.RemoteAddr())
 }
 
+// todo : check if wait needed
+// todo : reformat code
 // run executes the workflow of the server: listening a file, receiving the file over the connection, treating the image, and sending the image back to client.
 func (server *Server) run() {
 	listener := server.listen()
@@ -328,6 +383,8 @@ func (server *Server) run() {
 			log.Fatalf("Unexpected error closing listener: %v", err)
 		}
 	}(listener)
+
+	fmt.Println("The server is running... (Press Ctrl + C to stop)")
 
 	// Channels for managing concurrent workers
 	socketSemaphore := make(chan net.Conn, 5) // Limit to 5 concurrent connections
