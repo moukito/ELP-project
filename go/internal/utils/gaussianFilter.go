@@ -6,6 +6,11 @@ import (
 	"math"
 )
 
+const (
+	kernelSize = 15
+	sigma      = float64(kernelSize) / 6
+)
+
 // GenerateGaussianKernel dynamically creates a Gaussian kernel of any size and sigma.
 func GenerateGaussianKernel(size int, sigma float64) [][]float64 {
 	if size%2 == 0 {
@@ -65,4 +70,9 @@ func ApplyKernel(img *image.Gray, kernel [][]float64) *image.Gray {
 	}
 
 	return output
+}
+
+func ApplyKernelWrapper(img image.Image) (image.Image, error) {
+	kernel := GenerateGaussianKernel(kernelSize, sigma)
+	return ApplyKernel(img.(*image.Gray), kernel), nil
 }
