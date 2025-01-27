@@ -10,7 +10,7 @@ import (
 func ApplySobelEdgeDetection(img *image.Gray) (*image.Gray, [][]float64) {
 	bounds := img.Bounds()
 	edgeImage := image.NewGray(bounds)
-
+	// todo kernel size
 	// Sobel kernels for calculating Gx and Gy
 	sobelX := [3][3]float64{
 		{-1, 0, 1},
@@ -58,4 +58,9 @@ func ApplySobelEdgeDetection(img *image.Gray) (*image.Gray, [][]float64) {
 	}
 
 	return edgeImage, gradientMagnitudes
+}
+
+func ApplySobelEdgeDetectionWrapper(img image.Image) (image.Image, error) {
+	res, _ := ApplySobelEdgeDetection(img.(*image.Gray))
+	return res, nil
 }
