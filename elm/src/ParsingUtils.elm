@@ -55,7 +55,7 @@ instructionParser =
 -- Program parser: Parse entire program
 
 
-programParser : Parser (List Instruction)
+programParser : Parser TcTurtle.Program
 programParser =
     Parser.sequence
         { start = "["
@@ -71,7 +71,7 @@ programParser =
 -- Entry point for parsing
 
 
-read : String -> Result (List Parser.DeadEnd) (List Instruction)
+read : String -> Result (List Parser.DeadEnd) TcTurtle.Program
 read input =
     run programParser input
 
@@ -102,7 +102,7 @@ executeCommand command =
 -- Fonction pour exécuter un programme
 
 
-executeProgram : List Instruction -> String
+executeProgram : TcTurtle.Program -> String
 executeProgram program =
     String.join "\n" (List.map executeCommand program)
 

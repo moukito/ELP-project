@@ -7,6 +7,7 @@ import Html.Attributes exposing (placeholder, value)
 import Html.Events exposing (onClick, onInput)
 import ParsingUtils exposing (read)
 import Svg exposing (Svg, svg)
+import Svg.Attributes
 
 
 
@@ -24,7 +25,7 @@ init : Model Never
 init =
     { code = ""
     , error = Nothing
-    , svg = svg [] []
+    , svg = svg [ Svg.Attributes.viewBox "0 0 500 500", Svg.Attributes.width "500", Svg.Attributes.height "500" ] []
     }
 
 
@@ -66,11 +67,12 @@ view model =
         , button [ onClick ParseCode ] [ text "Parse & Draw" ]
         , case model.error of
             Nothing ->
-                text ""
+                div [] [ Html.map (always ParseCode) model.svg ] -- Wrap here using Html.map
+
 
             Just err ->
                 div [] [ text err ]
-        --, Html.map (always ()) (Html.fromSvg model.svg)
+
         ]
 
 

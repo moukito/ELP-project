@@ -3,6 +3,7 @@ module DrawingUtils exposing (display)
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
 import TcTurtle exposing (Instruction(..), Program)
+import Debug
 
 
 type alias Position =
@@ -68,11 +69,11 @@ execute pos instruction =
 -- Convert complete program to SVG
 
 
-display : Program -> Svg msg
+--display : Program -> Svg msg
 display program =
     let
         initialPosition =
-            { x = 0, y = 0, angle = 0 }
+            { x = 250, y = 250, angle = 0 }
 
         ( _, svgs ) =
             List.foldl

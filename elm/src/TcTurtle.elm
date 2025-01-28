@@ -8,5 +8,5 @@ type Instruction
     | Repeat Int (List Instruction)
 
 
-type alias Program
-    = List Instruction
+type alias Program =
+    List Instruction
