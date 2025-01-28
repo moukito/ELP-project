@@ -24,11 +24,15 @@ p {
     grid-gap: 30px;
 }
 
-.error{
+/* Error div styles */
+.error {
     text-align: center;
-    width: 100%;
-    max-width: 500px;
-    border: 1px solid #D1C4E9;
+    color: red;
+    padding: 10px;
+    width: auto;
+    border: 1px solid #D32F2F;
+    background-color: #FFEBEE;
+    margin-top: 10px;
 }
 
 svg{
@@ -36,6 +40,56 @@ svg{
     max-width: 500px;
     border: 1px solid #D1C4E9;
 }
+
+/* Button styles */
+.button {
+    padding: 10px 20px;
+    color: white;
+    background-color: #673AB7;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.button:hover {
+    background-color: #5E35B1;
+}
+
+/* SVG wrapper styles */
+.svg {
+    padding: 10px;
+    background-color: #f9f9f9;
+    border: 1px solid #d1c4e9;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 20px;
+}
+
+.input {
+    --uiFieldPlaceholderColor: var(--fieldPlaceholderColor, #767676);
+
+    background-color: transparent;
+    border: none;
+    outline: 2px solid transparent; /* Initial outline (hidden) */
+    border-radius: 4px; /* Optional: Adds rounded corners */
+    transition: outline 0.2s ease-in-out, border-color 0.2s ease-in-out;
+
+    font-family: inherit;
+    font-size: inherit;
+
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+
+/* Outline on focus */
+.input:focus {
+    outline: 2px solid #673AB7; /* Purple outline when focused */
+    border-color: #673AB7;      /* Match the border color to the outline */
+    outline-offset: 2px;        /* Creates extra spacing between the input and outline */
+}
+
 
 /*
 =====

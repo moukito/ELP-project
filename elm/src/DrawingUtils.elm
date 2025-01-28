@@ -3,7 +3,6 @@ module DrawingUtils exposing (display)
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
 import TcTurtle exposing (Instruction(..), Program)
-import Debug
 
 
 type alias Position =

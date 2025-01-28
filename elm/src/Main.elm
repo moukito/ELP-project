@@ -62,16 +62,16 @@ update msg model =
 
 view : Model Never -> Html Msg
 view model =
-    div []
-        [ input [ placeholder "Enter TcTurtle code", onInput UpdateCode, value model.code ] []
-        , button [ onClick ParseCode ] [ text "Parse & Draw" ]
+    div [ Html.Attributes.class "page" ]
+        [ input [ placeholder "Enter TcTurtle code", Html.Attributes.class "input", onInput UpdateCode, value model.code ] []
+        , button [ Html.Attributes.class "button", onClick ParseCode ] [ text "Parse & Draw" ]
         , case model.error of
             Nothing ->
-                div [] [ Html.map (always ParseCode) model.svg ] -- Wrap here using Html.map
+                div [ Html.Attributes.class "svg" ] [ Html.map (always ParseCode) model.svg ] -- Wrap here using Html.map
 
 
             Just err ->
-                div [] [ text err ]
+                div [ Html.Attributes.class "error" ] [ text err ]
 
         ]
 
