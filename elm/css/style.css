@@ -90,6 +90,35 @@ svg{
     outline-offset: 2px;        /* Creates extra spacing between the input and outline */
 }
 
+.zoom-button {
+    padding: 10px 15px; /* Size of the button */
+    background-color: #1976D2; /* Blue color */
+    color: white;
+    border: none;
+    border-radius: 3px; /* Slightly rounded corners */
+    font-size: 14px; /* Smaller font size */
+    font-weight: bold;
+    margin: 5px; /* Space between buttons */
+    cursor: pointer;
+}
+
+/* Hover effect */
+.zoom-button:hover {
+    background-color: #1565C0; /* Darker blue for hover */
+    color: #E3F2FD; /* Slightly lighter white on hover */
+}
+
+/* Optional: Add consistent alignment for the zoom controls */
+.zoom-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.zoom-controls > button {
+    margin: 0 5px; /* Add horizontal margin between buttons */
+}
 
 /*
 =====

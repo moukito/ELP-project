@@ -66,13 +66,13 @@ execute pos instruction =
 
 
 -- Convert complete program to SVG
---display : Program -> Svg msg
 
 
-display program =
+display : Program -> Float -> Svg msg
+display program zoom =
     let
         initialPosition =
-            { x = 250, y = 250, angle = 0 }
+            { x = 500, y = 500, angle = 0 }
 
         ( _, svgs ) =
             List.foldl
@@ -85,5 +85,11 @@ display program =
                 )
                 ( initialPosition, [] )
                 program
+
+        center =
+            500 / zoom
+
+        viewBoxSize =
+            1000 / zoom
     in
-    svg [ viewBox "0 0 500 500", width "500", height "500" ] svgs
+    svg [ viewBox (String.join " " [ String.fromFloat (viewBoxSize - 2 * center), String.fromFloat (viewBoxSize - 2 * center), String.fromFloat viewBoxSize, String.fromFloat viewBoxSize ]), width "500", height "500" ] svgs
