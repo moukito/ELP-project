@@ -8,29 +8,36 @@ import TcTurtle exposing (Instruction(..), Program)
 type alias Position =
     { x : Float, y : Float, angle : Float }
 
+type alias Color =
+    { red : Int, green : Int, blue : Int, alpha : Float }
 
 
--- Execute a single instruction
+-- Convert a Color to a valid CSS RGBA string
+colorToString : Color -> String
+colorToString color =
+    "rgba("
+        ++ String.fromInt color.red ++ ", "
+        ++ String.fromInt color.green ++ ", "
+        ++ String.fromInt color.blue ++ ", "
+        ++ String.fromFloat color.alpha ++ ")"
 
-
-execute : Position -> Instruction -> ( Position, List (Svg msg) )
-execute pos instruction =
+-- Execute a single turtle instruction and return the new position and SVG elements
+execute : Position -> Instruction -> Color -> ( Position, List (Svg msg) )
+execute pos instruction color =
     case instruction of
         Forward n ->
             let
                 newX =
                     pos.x + toFloat n * cos (degrees pos.angle)
-
                 newY =
                     pos.y + toFloat n * sin (degrees pos.angle)
-
                 lineSvg =
                     line
                         [ x1 (String.fromFloat pos.x)
                         , y1 (String.fromFloat pos.y)
                         , x2 (String.fromFloat newX)
                         , y2 (String.fromFloat newY)
-                        , stroke "black"
+                        , stroke (colorToString color)
                         ]
                         []
             in
@@ -51,7 +58,7 @@ execute pos instruction =
                                 (\instr ( pNext, accNext ) ->
                                     let
                                         ( nextPos, svg ) =
-                                            execute pNext instr
+                                            execute pNext instr color
                                     in
                                     ( nextPos, accNext ++ svg )
                                 )
@@ -64,12 +71,9 @@ execute pos instruction =
             ( newPos, svgs )
 
 
-
--- Convert complete program to SVG
-
-
---display : Program -> Svg msg
-display program =
+-- Convert a complete program into SVG using the given color
+display : Program -> Color -> Svg msg
+display program color =
     let
         initialPosition =
             { x = 250, y = 250, angle = 0 }
@@ -79,7 +83,7 @@ display program =
                 (\instr ( pos, acc ) ->
                     let
                         ( newPos, svg ) =
-                            execute pos instr
+                            execute pos instr color
                     in
                     ( newPos, acc ++ svg )
                 )
