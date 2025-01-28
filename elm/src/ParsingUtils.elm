@@ -1,4 +1,4 @@
-module ParsingUtils exposing (programParser, read)
+module ParsingUtils exposing (programParser, read, parseErrorToString)
 
 import Parser exposing (..)
 import TcTurtle exposing (..)
@@ -75,6 +75,31 @@ read : String -> Result (List Parser.DeadEnd) TcTurtle.Program
 read input =
     run programParser input
 
+
+--
+
+parseErrorToString : List Parser.DeadEnd -> String
+parseErrorToString errors =
+    case errors of
+        [] ->
+            "An unknown error occurred while parsing."
+
+        firstError :: _ ->
+            case firstError.problem of
+                Parser.Expecting _ ->
+                    "It seems like you forgot to close a bracket. Make sure all brackets match: [ ... ]"
+
+                Parser.ExpectingSymbol _ ->
+                    "Expected Forward, Left, Right or Repeat. Please check your syntax."
+
+                Parser.ExpectingInt ->
+                    "Expected an integer. Please check your syntax."
+
+                Parser.BadRepeat ->
+                    "It looks like there is an invalid format in a repeat block."
+
+                _ ->
+                    "Invalid syntax. Please check your program for errors."
 
 
 -- Exemple de test

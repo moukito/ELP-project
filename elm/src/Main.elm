@@ -5,7 +5,7 @@ import DrawingUtils exposing (display)
 import Html exposing (Html, button, div, input, text)
 import Html.Attributes exposing (placeholder, value)
 import Html.Events exposing (onClick, onInput)
-import ParsingUtils exposing (read)
+import ParsingUtils exposing (read, parseErrorToString)
 import Svg exposing (Svg, svg)
 import Svg.Attributes
 
@@ -51,7 +51,7 @@ update msg model =
 
                 Err problems ->
                     { model
-                        | error = Just "Syntax Error!"
+                        | error = Just (parseErrorToString problems) -- "Syntax Error!"
                         , svg = svg [] []
                     }
 
