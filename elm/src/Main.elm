@@ -5,7 +5,7 @@ import DrawingUtils exposing (display)
 import Html exposing (Html, button, div, input, text)
 import Html.Attributes exposing (placeholder, value)
 import Html.Events exposing (onClick, onInput)
-import ParsingUtils exposing (read, parseErrorToString)
+import ParsingUtils exposing (parseErrorToString, read)
 import Svg exposing (Svg, svg)
 import Svg.Attributes
 import TcTurtle exposing (Program)
@@ -27,6 +27,7 @@ type alias Model msg =
     , customGreen : String
     , customBlue : String
     , customAlpha : String
+    , zoom : Float
     }
 
 
@@ -41,6 +42,7 @@ init =
     , customGreen = "0"
     , customBlue = "0"
     , customAlpha = "1.0"
+    , zoom = 1.0
     }
 
 
@@ -53,6 +55,8 @@ type Msg
     | ChangeColor Color
     | UpdateCustomColor String String String String
     | SetCustomColor
+    | ZoomIn
+    | ZoomOut
 
 
 update : Msg -> Model Never -> Model Never
@@ -66,7 +70,7 @@ update msg model =
                 Ok program ->
                     { model
                         | error = Nothing
-                        , svg = display program model.color
+                        , svg = display program model.zoom model.color
                         , program = Just program
                     }
 
@@ -82,7 +86,7 @@ update msg model =
                 Just program ->
                     { model
                         | color = newColor
-                        , svg = display program newColor
+                        , svg = display program model.zoom newColor
                     }
 
                 Nothing ->
@@ -109,7 +113,7 @@ update msg model =
                     in
                     { model
                         | color = newColor
-                        , svg = display program newColor
+                        , svg = display program model.zoom newColor
                     }
 
                 Nothing ->
@@ -122,6 +126,28 @@ update msg model =
                             }
                     in
                     { model | color = newColor }
+
+        ZoomIn ->
+            case model.program of
+                Just program ->
+                    { model
+                        | zoom = model.zoom * 1.1
+                        , svg = display program (model.zoom * 1.1) model.color
+                    }
+
+                Nothing ->
+                    { model | zoom = model.zoom * 1.1 }
+
+        ZoomOut ->
+            case model.program of
+                Just program ->
+                    { model
+                        | zoom = model.zoom * 0.9
+                        , svg = display program (model.zoom * 0.9) model.color
+                    }
+
+                Nothing ->
+                    { model | zoom = model.zoom * 0.9 }
 
 
 
@@ -188,6 +214,11 @@ view model =
                 ]
                 [ text "Set Custom Color" ]
             ]
+        , div [ Html.Attributes.class "zoom-controls" ]
+            [ text "Zoom Controls: "
+            , button [ Html.Attributes.class "zoom-button", onClick ZoomIn ] [ text "+" ]
+            , button [ Html.Attributes.class "zoom-button", onClick ZoomOut ] [ text "−" ]
+            ]
         , case model.error of
             Nothing ->
                 div [ Html.Attributes.class "svg" ] [ Html.map (always ParseCode) model.svg ]
@@ -202,3 +233,4 @@ view model =
 
 main =
     Browser.sandbox { init = init, update = update, view = view }
+

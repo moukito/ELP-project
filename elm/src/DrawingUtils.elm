@@ -13,6 +13,7 @@ type alias Color =
 
 
 -- Convert a Color to a valid CSS RGBA string
+
 colorToString : Color -> String
 colorToString color =
     "rgba("
@@ -22,6 +23,7 @@ colorToString color =
         ++ String.fromFloat color.alpha ++ ")"
 
 -- Execute a single turtle instruction and return the new position and SVG elements
+
 execute : Position -> Instruction -> Color -> ( Position, List (Svg msg) )
 execute pos instruction color =
     case instruction of
@@ -71,12 +73,14 @@ execute pos instruction color =
             ( newPos, svgs )
 
 
--- Convert a complete program into SVG using the given color
-display : Program -> Color -> Svg msg
-display program color =
+
+-- Convert a complete program into SVG with support for zoom and color
+
+display : Program -> Float -> Color -> Svg msg
+display program zoom color =
     let
         initialPosition =
-            { x = 250, y = 250, angle = 0 }
+            { x = 500, y = 500, angle = 0 }
 
         ( _, svgs ) =
             List.foldl
@@ -89,5 +93,16 @@ display program color =
                 )
                 ( initialPosition, [] )
                 program
+
+        center =
+            500 / zoom
+
+        viewBoxSize =
+            1000 / zoom
     in
-    svg [ viewBox "0 0 500 500", width "500", height "500" ] svgs
+    svg 
+        [ viewBox (String.join " " [ String.fromFloat (viewBoxSize - 2 * center), String.fromFloat (viewBoxSize - 2 * center), String.fromFloat viewBoxSize, String.fromFloat viewBoxSize ])
+        , width "500"
+        , height "500"
+        ] 
+        svgs
