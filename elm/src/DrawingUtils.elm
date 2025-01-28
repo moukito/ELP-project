@@ -66,9 +66,9 @@ execute pos instruction =
 
 
 -- Convert complete program to SVG
-
-
 --display : Program -> Svg msg
+
+
 display program =
     let
         initialPosition =

@@ -5,7 +5,7 @@ import DrawingUtils exposing (display)
 import Html exposing (Html, button, div, input, text)
 import Html.Attributes exposing (placeholder, value)
 import Html.Events exposing (onClick, onInput)
-import ParsingUtils exposing (read, parseErrorToString)
+import ParsingUtils exposing (parseErrorToString, read)
 import Svg exposing (Svg, svg)
 import Svg.Attributes
 
@@ -67,12 +67,11 @@ view model =
         , button [ Html.Attributes.class "button", onClick ParseCode ] [ text "Parse & Draw" ]
         , case model.error of
             Nothing ->
-                div [ Html.Attributes.class "svg" ] [ Html.map (always ParseCode) model.svg ] -- Wrap here using Html.map
+                div [ Html.Attributes.class "svg" ] [ Html.map (always ParseCode) model.svg ]
 
-
+            -- Wrap here using Html.map
             Just err ->
                 div [ Html.Attributes.class "error" ] [ text err ]
-
         ]
 
 

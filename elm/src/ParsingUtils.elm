@@ -1,4 +1,4 @@
-module ParsingUtils exposing (programParser, read, parseErrorToString)
+module ParsingUtils exposing (parseErrorToString, programParser, read)
 
 import Parser exposing (..)
 import TcTurtle exposing (..)
@@ -76,7 +76,9 @@ read input =
     run programParser input
 
 
+
 --
+
 
 parseErrorToString : List Parser.DeadEnd -> String
 parseErrorToString errors =
@@ -100,6 +102,7 @@ parseErrorToString errors =
 
                 _ ->
                     "Invalid syntax. Please check your program for errors."
+
 
 
 -- Exemple de test
