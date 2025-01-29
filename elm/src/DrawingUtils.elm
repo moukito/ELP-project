@@ -1,16 +1,18 @@
-module DrawingUtils exposing (display, Color)
+module DrawingUtils exposing (Color, display)
 
-{-|
-This module handles the rendering of TcTurtle programs into SVG elements.
+{-| This module handles the rendering of TcTurtle programs into SVG elements.
 
 Main functions:
+
   - `colorToString`: Converts a `Color` to an RGBA CSS string.
   - `execute`: Executes a single turtle instruction and returns updated state and SVG elements.
   - `display`: Converts a full program into an SVG graphic.
 
 Types:
+
   - `Position`: Represents the turtle's position and orientation.
   - `Color`: Represents the drawing color in RGBA format.
+
 -}
 
 import Svg exposing (..)
@@ -18,43 +20,51 @@ import Svg.Attributes exposing (..)
 import TcTurtle exposing (Instruction(..), Program)
 
 
+
 -- TYPES
 
-{-|
-Represents the turtle's position and orientation.
+
+{-| Represents the turtle's position and orientation.
 
 Fields:
+
   - `x`: X-coordinate of the turtle's position.
   - `y`: Y-coordinate of the turtle's position.
   - `angle`: Turtle's heading angle, in degrees.
+
 -}
 type alias Position =
     { x : Float, y : Float, angle : Float }
 
 
-{-|
-Represents the Turtle's drawing color.
+{-| Represents the Turtle's drawing color.
 
 Fields:
+
   - `red`: Int (0-255) - Red color component.
   - `green`: Int (0-255) - Green color component.
   - `blue`: Int (0-255) - Blue color component.
   - `alpha`: Float (0.0-1.0) - Alpha (opacity) component.
+
 -}
 type alias Color =
     { red : Int, green : Int, blue : Int, alpha : Float }
 
 
+
 -- UTILITY FUNCTIONS
 
-{-|
-Converts a `Color` to a valid CSS RGBA string.
+
+{-| Converts a `Color` to a valid CSS RGBA string.
 
 Parameters:
+
   - `color`: The `Color` to convert.
 
 Returns:
+
   - A string in `rgba(r, g, b, a)` format.
+
 -}
 colorToString : Color -> String
 colorToString color =
@@ -69,18 +79,22 @@ colorToString color =
         ++ ")"
 
 
+
 -- EXECUTION
 
-{-|
-Executes a single turtle instruction and returns the updated position and SVG elements.
+
+{-| Executes a single turtle instruction and returns the updated position and SVG elements.
 
 Parameters:
+
   - `pos`: The current `Position` of the turtle.
   - `instruction`: The `Instruction` to execute.
   - `color`: The drawing `Color`.
 
 Returns:
+
   - A tuple with the updated `Position` and a list of SVG elements.
+
 -}
 execute : Position -> Instruction -> Color -> ( Position, List (Svg msg) )
 execute pos instruction color =
@@ -133,18 +147,22 @@ execute pos instruction color =
             ( newPos, svgs )
 
 
+
 -- RENDERING
 
-{-|
-Converts a TcTurtle program into an SVG graphic.
+
+{-| Converts a TcTurtle program into an SVG graphic.
 
 Parameters:
+
   - `program`: The `Program` to draw.
   - `zoom`: The zoom level for rendering.
   - `color`: The drawing color.
 
 Returns:
+
   - An `Svg` element representing the full drawing.
+
 -}
 display : Program -> Float -> Color -> Svg msg
 display program zoom color =
@@ -171,7 +189,7 @@ display program zoom color =
             1000 / zoom
     in
     svg
-        [ viewBox (String.join " " [ String.fromFloat (viewBoxSize - 2 * center), String.fromFloat (viewBoxSize - 2 * center), String.fromFloat (viewBoxSize), String.fromFloat (viewBoxSize) ])
+        [ viewBox (String.join " " [ String.fromFloat (viewBoxSize - 2 * center), String.fromFloat (viewBoxSize - 2 * center), String.fromFloat viewBoxSize, String.fromFloat viewBoxSize ])
         , width "500"
         , height "500"
         ]

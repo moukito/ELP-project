@@ -1,16 +1,17 @@
 module Main exposing (..)
 
-{-|
-This is the main module of the application containing the entry point of the project.
+{-| This is the main module of the application containing the entry point of the project.
 
 It manages:
+
   - The overall app view.
   - The state of the model (such as user input, parsed code, and customizations).
   - User interaction (parsing code, changing colors, zooming, etc.).
+
 -}
 
 import Browser
-import DrawingUtils exposing (display, Color)
+import DrawingUtils exposing (Color, display)
 import Html exposing (Html, button, div, h3, input, text)
 import Html.Attributes exposing (placeholder, value)
 import Html.Events exposing (onClick, onInput)
@@ -20,12 +21,14 @@ import Svg.Attributes
 import TcTurtle exposing (Program)
 
 
+
 -- MODEL
 
-{-|
-Defines the `Model` for the main application state.
+
+{-| Defines the `Model` for the main application state.
 
 Fields:
+
   - `code` : String - The TcTurtle code entered by the user.
   - `error` : Maybe String - Any error messages displayed during parsing.
   - `svg` : Svg msg - The rendered SVG output based on parsed code.
@@ -33,6 +36,7 @@ Fields:
   - `program` : Maybe TcTurtle.Program - The parsed drawing instructions.
   - `customRed`, `customGreen`, `customBlue`, `customAlpha`: Strings - User-entered custom color values.
   - `zoom` : Float - The zoom level for SVG rendering.
+
 -}
 type alias Model msg =
     { code : String
@@ -47,8 +51,8 @@ type alias Model msg =
     , zoom : Float
     }
 
-{-|
-The initial state (model) of the application.
+
+{-| The initial state (model) of the application.
 -}
 init : Model Never
 init =
@@ -65,12 +69,14 @@ init =
     }
 
 
+
 -- UPDATE
 
-{-|
-Messages (`Msg`) define the possible user interactions within the app.
+
+{-| Messages (`Msg`) define the possible user interactions within the app.
 
 Variants:
+
   - `UpdateCode`: Fired when the user updates the input TcTurtle code.
   - `ParseCode`: Fired when the "Parse & Draw" button is clicked.
   - `ChangeColor`: Fired when the user chooses a predefined color button.
@@ -78,6 +84,7 @@ Variants:
   - `SetCustomColor`: Fired when the "Set Custom Color" button is clicked.
   - `ZoomIn`: Fired to zoom into the SVG.
   - `ZoomOut`: Fired to zoom out of the SVG.
+
 -}
 type Msg
     = UpdateCode String
@@ -88,15 +95,18 @@ type Msg
     | ZoomIn
     | ZoomOut
 
-{-|
-Handles app state updates based on `Msg`.
+
+{-| Handles app state updates based on `Msg`.
 
 Parameters:
+
   - `msg`: The message triggered by user interaction.
   - `model`: The current application state.
 
 Returns:
+
   - An updated version of the `Model`.
+
 -}
 update : Msg -> Model Never -> Model Never
 update msg model =
@@ -132,8 +142,9 @@ update msg model =
                     }
 
                 Nothing ->
-                    { model | color = newColor } -- Update only the color if no program exists
+                    { model | color = newColor }
 
+        -- Update only the color if no program exists
         -- Handle updating values in the custom color input fields
         UpdateCustomColor red green blue alpha ->
             { model
@@ -196,16 +207,20 @@ update msg model =
                     { model | zoom = model.zoom * 0.9 }
 
 
+
 -- VIEW
 
-{-|
-Constructs the HTML structure of the app.
+
+{-| Constructs the HTML structure of the app.
 
 Parameters:
+
   - `model`: The current application state.
 
 Returns:
+
   - The view (HTML) as a `Html Msg`.
+
 -}
 view : Model Never -> Html Msg
 view model =
@@ -308,12 +323,14 @@ view model =
         ]
 
 
+
 -- PROGRAM
 
-{-|
-The entry point for the program using `Browser.sandbox`.
+
+{-| The entry point for the program using `Browser.sandbox`.
 
 Defines the main logic of the app by initializing, updating, and rendering the view.
+
 -}
 main =
     Browser.sandbox { init = init, update = update, view = view }

@@ -1,25 +1,27 @@
 module ParsingUtils exposing (parseErrorToString, programParser, read)
 
-{-|
-This module provides utilities for parsing TcTurtle programs, converting user input strings
+{-| This module provides utilities for parsing TcTurtle programs, converting user input strings
 to structured `Program` data, and handling errors during the parsing process.
 
 Main functions:
+
   - `programParser`: Parses a list of turtle instructions (`Program`).
   - `read`: Entry point for parsing a string into a `Program`.
   - `parseErrorToString`: Converts parsing errors to human-readable messages.
 
 Parsers for individual instructions are also included (e.g., `forwardParser`, `rightParser`, etc.).
+
 -}
 
 import Parser exposing (..)
 import TcTurtle exposing (..)
 
 
+
 -- PARSERS FOR INSTRUCTIONS
 
-{-|
-Parses the `Forward` instruction, which moves the turtle forward by a specified number of units.
+
+{-| Parses the `Forward` instruction, which moves the turtle forward by a specified number of units.
 Example syntax: `Forward 100`
 -}
 forwardParser : Parser Instruction
@@ -28,8 +30,7 @@ forwardParser =
         |= (symbol "Forward" |> andThen (\_ -> spaces) |> andThen (\_ -> int))
 
 
-{-|
-Parses the `Left` instruction, which turns the turtle left by a specified angle in degrees.
+{-| Parses the `Left` instruction, which turns the turtle left by a specified angle in degrees.
 Example syntax: `Left 90`
 -}
 leftParser : Parser Instruction
@@ -38,8 +39,7 @@ leftParser =
         |= (symbol "Left" |> andThen (\_ -> spaces) |> andThen (\_ -> int))
 
 
-{-|
-Parses the `Right` instruction, which turns the turtle right by a specified angle in degrees.
+{-| Parses the `Right` instruction, which turns the turtle right by a specified angle in degrees.
 Example syntax: `Right 90`
 -}
 rightParser : Parser Instruction
@@ -48,8 +48,7 @@ rightParser =
         |= (symbol "Right" |> andThen (\_ -> spaces) |> andThen (\_ -> int))
 
 
-{-|
-Parses the `Repeat` instruction, which repeats a given sequence of instructions a specified number of times.
+{-| Parses the `Repeat` instruction, which repeats a given sequence of instructions a specified number of times.
 Example syntax: `Repeat 4 [ Forward 100, Left 90 ]`
 -}
 repeatParser : Parser Instruction
@@ -67,8 +66,7 @@ repeatParser =
            )
 
 
-{-|
-Parses any individual turtle instruction (`Forward`, `Left`, `Right`, or `Repeat`).
+{-| Parses any individual turtle instruction (`Forward`, `Left`, `Right`, or `Repeat`).
 -}
 instructionParser : Parser Instruction
 instructionParser =
@@ -80,10 +78,11 @@ instructionParser =
         ]
 
 
+
 -- PARSER FOR ENTIRE PROGRAM
 
-{-|
-Parses an entire list of instructions enclosed in brackets.
+
+{-| Parses an entire list of instructions enclosed in brackets.
 Example syntax: `[ Forward 100, Left 90, Forward 50 ]`
 -}
 programParser : Parser TcTurtle.Program
@@ -98,32 +97,40 @@ programParser =
         }
 
 
+
 -- ENTRY POINT
 
-{-|
-Parses the user input string into a `Program`.
+
+{-| Parses the user input string into a `Program`.
 
 Parameters:
+
   - `input`: User input string.
 
 Returns:
+
   - A `Result` containing either the parsed program or a list of parsing errors.
+
 -}
 read : String -> Result (List Parser.DeadEnd) TcTurtle.Program
 read input =
     run programParser input
 
 
+
 -- ERROR HANDLING
 
-{-|
-Converts a list of parsing errors into a human-readable message.
+
+{-| Converts a list of parsing errors into a human-readable message.
 
 Parameters:
+
   - `errors`: A list of `Parser.DeadEnd` values representing parsing errors.
 
 Returns:
+
   - A string describing the first error in the list.
+
 -}
 parseErrorToString : List Parser.DeadEnd -> String
 parseErrorToString errors =
