@@ -77,7 +77,7 @@ read input =
 
 
 
---
+-- Error handling
 
 
 parseErrorToString : List Parser.DeadEnd -> String
@@ -105,8 +105,7 @@ parseErrorToString errors =
 
 
 
--- Exemple de test
--- Fonction pour exécuter une commande
+-- Tests example
 
 
 executeCommand : Instruction -> String
@@ -127,7 +126,6 @@ executeCommand command =
 
 
 
--- Fonction pour exécuter un programme
 
 
 executeProgram : TcTurtle.Program -> String
@@ -136,7 +134,6 @@ executeProgram program =
 
 
 
--- Fonction pour analyser et exécuter le programme
 
 
 processInput : String -> String
