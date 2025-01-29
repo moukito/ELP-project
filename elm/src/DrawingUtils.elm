@@ -8,21 +8,31 @@ import TcTurtle exposing (Instruction(..), Program)
 type alias Position =
     { x : Float, y : Float, angle : Float }
 
+
 type alias Color =
     { red : Int, green : Int, blue : Int, alpha : Float }
 
 
+
 -- Convert a Color to a valid CSS RGBA string
+
 
 colorToString : Color -> String
 colorToString color =
     "rgba("
-        ++ String.fromInt color.red ++ ", "
-        ++ String.fromInt color.green ++ ", "
-        ++ String.fromInt color.blue ++ ", "
-        ++ String.fromFloat color.alpha ++ ")"
+        ++ String.fromInt color.red
+        ++ ", "
+        ++ String.fromInt color.green
+        ++ ", "
+        ++ String.fromInt color.blue
+        ++ ", "
+        ++ String.fromFloat color.alpha
+        ++ ")"
+
+
 
 -- Execute a single turtle instruction and return the new position and SVG elements
+
 
 execute : Position -> Instruction -> Color -> ( Position, List (Svg msg) )
 execute pos instruction color =
@@ -31,8 +41,10 @@ execute pos instruction color =
             let
                 newX =
                     pos.x + toFloat n * cos (degrees pos.angle)
+
                 newY =
                     pos.y + toFloat n * sin (degrees pos.angle)
+
                 lineSvg =
                     line
                         [ x1 (String.fromFloat pos.x)
@@ -76,6 +88,7 @@ execute pos instruction color =
 
 -- Convert a complete program into SVG with support for zoom and color
 
+
 display : Program -> Float -> Color -> Svg msg
 display program zoom color =
     let
@@ -100,9 +113,9 @@ display program zoom color =
         viewBoxSize =
             1000 / zoom
     in
-    svg 
-        [ viewBox (String.join " " [ String.fromFloat (viewBoxSize - 2 * center), String.fromFloat (viewBoxSize - 2 * center), String.fromFloat viewBoxSize, String.fromFloat viewBoxSize ])
+    svg
+        [ viewBox (String.join " " [ String.fromFloat (viewBoxSize - 2 * center), String.fromFloat (viewBoxSize - 2 * center), String.fromFloat (viewBoxSize), String.fromFloat (viewBoxSize) ])
         , width "500"
         , height "500"
-        ] 
+        ]
         svgs
