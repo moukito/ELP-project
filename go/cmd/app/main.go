@@ -10,8 +10,8 @@ import (
 // Main Canny filter pipeline.
 func main() {
 	// Input/output paths
-	inputPath := "input.png"
-	outputPath := "output.png"
+	inputPath := "./go/input.jpg"
+	outputPath := "output.jpg"
 
 	// Load image
 	img, format, err := imageUtils.LoadImage(inputPath)
@@ -22,16 +22,7 @@ func main() {
 	// Convert to grayscale
 	grayImg := imageUtils.Grayscale(img)
 
-	// Customize Gaussian kernel
-	kernelSize := 15
-	kernelSigma := float64(kernelSize) / 6
-	gaussianKernel := utils.GenerateGaussianKernel(kernelSize, kernelSigma)
-
-	// Apply Gaussian blur
-	blurredImg := utils.ApplyKernel(grayImg, gaussianKernel)
-
-	// Apply Sobel edge detection
-	edges, _ := utils.ApplySobelEdgeDetection(blurredImg)
+	edges := utils.ApplyCannyEdgeDetection(grayImg, 50, 150)
 
 	// Save the result
 	err = imageUtils.SaveImage(edges, outputPath, format)
