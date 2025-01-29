@@ -23,7 +23,3 @@ func Grayscale(img image.Image) *image.Gray {
 
 	return grayImage
 }
-
-func GrayscaleWrapper(img image.Image) (image.Image, error) {
-	return Grayscale(img), nil
-}

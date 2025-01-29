@@ -124,10 +124,3 @@ func ApplySobelEdgeDetection(img *image.Gray, kernelX, kernelY [][]float64) (*im
 
 	return output, gradientAngles
 }
-
-/* todo : delete wrapper
-func ApplySobelEdgeDetectionWrapper(img image.Image) (image.Image, error) {
-	res, _ := ApplySobelEdgeDetection(img.(*image.Gray))
-	return res, nil
-}
-*/

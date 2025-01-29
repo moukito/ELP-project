@@ -18,7 +18,6 @@ import (
 	"os/signal"
 	"runtime"
 	"sort"
-	"sync"
 )
 
 const (
@@ -46,7 +45,6 @@ type Task struct {
 	err        error       // Error during processing
 	resultChan chan<- Task
 	function   func(image.Image) (image.Image, error)
-	wg         *sync.WaitGroup
 }
 
 // newServer create a new server instance
@@ -207,9 +205,7 @@ func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, 
 	}
 	log.Println("Image received successfully!")
 	// Create a dedicated result channel for this task
-	resultChan := make(chan Task, 100)
-	var wg sync.WaitGroup
-	wg.Add(server.numWorkers)
+	resultGrayChan := make(chan Task, 100)
 
 	// Convert the received image to a concrete type that supports SubImage
 	rgbaImg, ok := img.(*image.RGBA)
@@ -247,40 +243,17 @@ func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, 
 			log.Fatalf("SubImage cast failed: expected *image.RGBA")
 		}
 
-		wg.Add(1)
 		// Create and submit a task for the subimage
 		task := Task{
 			conn:       conn,
 			img:        subImage,
-			wg:         &wg,
-			resultChan: resultChan,
-			function:   imageUtils.GrayscaleWrapper,
+			resultChan: resultGrayChan,
+			function:   GrayscaleWrapper,
 		}
 		treatmentChan <- task
 	}
 
-	resultGrayChan := make(chan Task, 100)
-
-	for i := 0; i < server.numWorkers; i++ {
-		select {
-		case result := <-resultChan: // Get the processed task back (if applicable)
-			if result.err != nil {
-				log.Printf("Error processing image for %s: %v", conn.RemoteAddr(), result.err)
-				return
-			}
-			task := Task{
-				conn:       conn,
-				img:        result.img,
-				wg:         &wg,
-				resultChan: resultGrayChan,
-				function:   utils.ApplyKernelWrapper,
-			}
-			treatmentChan <- task
-		case <-server.stopCtx.Done(): // Handle shutdown gracefully
-			log.Println("Server is shutting down, closing connection.")
-			return
-		}
-	}
+	resultCannyChan := make(chan Task, 100)
 
 	for i := 0; i < server.numWorkers; i++ {
 		select {
@@ -289,13 +262,11 @@ func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, 
 				log.Printf("Error processing image for %s: %v", conn.RemoteAddr(), result.err)
 				return
 			}
-			wg.Add(1)
 			task := Task{
 				conn:       conn,
 				img:        result.img,
-				wg:         &wg,
-				resultChan: resultChan,
-				function:   utils.ApplySobelEdgeDetectionWrapper,
+				resultChan: resultCannyChan,
+				function:   ApplyCannyEdgeDetectionWrapper,
 			}
 			treatmentChan <- task
 		case <-server.stopCtx.Done(): // Handle shutdown gracefully
@@ -303,14 +274,14 @@ func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, 
 			return
 		}
 	}
+	close(resultGrayChan)
 
 	// Wait for all results and assemble the final image
 	results := make([]*image.Gray, server.numWorkers)
-	//wg.Wait()
 
 	for i := 0; i < server.numWorkers; i++ {
 		select {
-		case result := <-resultChan: // Get the processed task back (if applicable)
+		case result := <-resultCannyChan: // Get the processed task back
 			if result.err != nil {
 				log.Printf("Error processing image for %s: %v", conn.RemoteAddr(), result.err)
 				return
@@ -321,7 +292,7 @@ func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, 
 			return
 		}
 	}
-	close(resultChan)
+	close(resultCannyChan)
 
 	// Sort the results by the Y-coordinate (Min.Y) of their bounds
 	sort.Slice(results, func(i, j int) bool {
@@ -339,6 +310,14 @@ func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, 
 	log.Printf("Sending processed image back to %s", conn.RemoteAddr())
 	server.sendImage(conn, finalImage, format)
 	log.Println("Connection finished:", conn.RemoteAddr())
+}
+
+func ApplyCannyEdgeDetectionWrapper(img image.Image) (image.Image, error) {
+	return utils.ApplyCannyEdgeDetection(img.(*image.Gray), 50, 150), nil
+}
+
+func GrayscaleWrapper(img image.Image) (image.Image, error) {
+	return imageUtils.Grayscale(img), nil
 }
 
 // treatmentWorker processes the task and sends it back to the result channel.
@@ -364,9 +343,6 @@ func (server *Server) treatmentWorker(task Task, _ chan<- Task) {
 	// Send the processed task to the output channel
 	if task.resultChan != nil {
 		task.resultChan <- task
-	}
-	if task.wg != nil {
-		task.wg.Done()
 	}
 	log.Printf("Task processing completed for connection: %v", task.conn.RemoteAddr())
 }
@@ -397,7 +373,11 @@ func (server *Server) run() {
 	go func() {
 		<-server.stopCtx.Done() // Wait for cancellation
 		log.Println("Shutting down server...")
-		listener.Close() // Close the listener
+		err := listener.Close()
+		if err != nil {
+			log.Printf("Error closing listener: %v", err)
+			return
+		}
 		close(socketSemaphore)
 		close(treatmentChan)
 		log.Println("All workers will stop after completing their tasks.")
