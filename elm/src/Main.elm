@@ -2,7 +2,7 @@ module Main exposing (..)
 
 import Browser
 import DrawingUtils exposing (display)
-import Html exposing (Html, button, div, input, text)
+import Html exposing (Html, button, div, input, text, h3)
 import Html.Attributes exposing (placeholder, value)
 import Html.Events exposing (onClick, onInput)
 import ParsingUtils exposing (parseErrorToString, read)
@@ -44,7 +44,6 @@ init =
     , customAlpha = "1.0"
     , zoom = 1.0
     }
-
 
 
 -- UPDATE
@@ -168,51 +167,60 @@ view model =
             , onClick ParseCode
             ]
             [ text "Parse & Draw" ]
-        , div [ Html.Attributes.class "color-buttons" ]
-            [ button
-                [ onClick (ChangeColor { red = 0, green = 0, blue = 0, alpha = 1.0 }) ]
-                [ text "Black" ]
-            , button
-                [ onClick (ChangeColor { red = 255, green = 0, blue = 0, alpha = 1.0 }) ]
-                [ text "Red" ]
-            , button
-                [ onClick (ChangeColor { red = 0, green = 255, blue = 0, alpha = 1.0 }) ]
-                [ text "Green" ]
-            , button
-                [ onClick (ChangeColor { red = 0, green = 0, blue = 255, alpha = 1.0 }) ]
-                [ text "Blue" ]
-            ]
-        , div [ Html.Attributes.class "custom-color" ]
-            [ text "Custom Color:"
-            , input
-                [ placeholder "Red (0-255)"
-                , value model.customRed
-                , onInput (\v -> UpdateCustomColor v model.customGreen model.customBlue model.customAlpha)
+        , div [ Html.Attributes.class "color-section" ]
+            [ h3 [ Html.Attributes.class "color-title small-font" ] [ text "Choose a color for your pencil:" ]
+            , div [ Html.Attributes.class "color-buttons" ]
+                [ button
+                    [ onClick (ChangeColor { red = 0, green = 0, blue = 0, alpha = 1.0 }) ]
+                    [ text "Black" ]
+                , button
+                    [ onClick (ChangeColor { red = 255, green = 0, blue = 0, alpha = 1.0 }) ]
+                    [ text "Red" ]
+                , button
+                    [ onClick (ChangeColor { red = 0, green = 255, blue = 0, alpha = 1.0 }) ]
+                    [ text "Green" ]
+                , button
+                    [ onClick (ChangeColor { red = 0, green = 0, blue = 255, alpha = 1.0 }) ]
+                    [ text "Blue" ]
                 ]
-                []
-            , input
-                [ placeholder "Green (0-255)"
-                , value model.customGreen
-                , onInput (\v -> UpdateCustomColor model.customRed v model.customBlue model.customAlpha)
+            , div [ Html.Attributes.class "custom-color" ]
+                [ text "Or decide the color you want:"
+                , div [ Html.Attributes.class "color-inputs" ]
+                [ input
+                    [ placeholder "Red (0-255)"
+                    , value model.customRed
+                    , onInput (\v -> UpdateCustomColor v model.customGreen model.customBlue model.customAlpha)
+                    , Html.Attributes.class "small-input"
+                    ]
+                    []
+                , input
+                    [ placeholder "Green (0-255)"
+                    , value model.customGreen
+                    , onInput (\v -> UpdateCustomColor model.customRed v model.customBlue model.customAlpha)
+                    , Html.Attributes.class "small-input"
+                    ]
+                    []
+                , input
+                    [ placeholder "Blue (0-255)"
+                    , value model.customBlue
+                    , onInput (\v -> UpdateCustomColor model.customRed model.customGreen v model.customAlpha)
+                    , Html.Attributes.class "small-input"
+                    ]
+                    []
+                , input
+                    [ placeholder "Alpha (0.0-1.0)"
+                    , value model.customAlpha
+                    , onInput (\v -> UpdateCustomColor model.customRed model.customGreen model.customBlue v)
+                    , Html.Attributes.class "small-input"
+                    ]
+                    []
+                ]   
+                , button
+                    [ Html.Attributes.class "button"
+                    , onClick SetCustomColor
+                    ]
+                    [ text "Set Custom Color" ]
                 ]
-                []
-            , input
-                [ placeholder "Blue (0-255)"
-                , value model.customBlue
-                , onInput (\v -> UpdateCustomColor model.customRed model.customGreen v model.customAlpha)
-                ]
-                []
-            , input
-                [ placeholder "Alpha (0.0-1.0)"
-                , value model.customAlpha
-                , onInput (\v -> UpdateCustomColor model.customRed model.customGreen model.customBlue v)
-                ]
-                []
-            , button
-                [ Html.Attributes.class "button"
-                , onClick SetCustomColor
-                ]
-                [ text "Set Custom Color" ]
             ]
         , div [ Html.Attributes.class "zoom-controls" ]
             [ text "Zoom Controls: "
@@ -226,7 +234,6 @@ view model =
             Just err ->
                 div [ Html.Attributes.class "error" ] [ text err ]
         ]
-
 
 
 -- PROGRAM

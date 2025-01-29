@@ -71,7 +71,8 @@ svg{
     --uiFieldPlaceholderColor: var(--fieldPlaceholderColor, #767676);
 
     background-color: transparent;
-    border: none;
+    border: 2px solid #673AB7;
+    padding: 8px; 
     outline: 2px solid transparent; /* Initial outline (hidden) */
     border-radius: 4px; /* Optional: Adds rounded corners */
     transition: outline 0.2s ease-in-out, border-color 0.2s ease-in-out;
@@ -83,11 +84,50 @@ svg{
     -moz-appearance: none;
 }
 
+/* Input box for TcTurtle code 
+.input-box {
+    border: 2px solid #673AB7;
+    border-radius: 5px;
+    padding: 8px;
+    font-size: 1em;
+}
+
+.input-box:focus {
+    border-color: #673AB7;
+    outline: none;
+}*/
+
+/* Color Title */
+.color-title.small-font {
+    font-size: 1em;
+    font-weight: normal; 
+    margin-bottom: 10px;
+}
+
+/* Input box for colors */
+.color-inputs {
+    display: flex;
+    gap: 10px;
+    margin: 10px 0;
+}
+
+.small-input {
+    width: 100px;
+    padding: 5px; 
+    font-size: 0.9em;
+}
+
+
 /* Outline on focus */
 .input:focus {
     outline: 2px solid #673AB7; /* Purple outline when focused */
     border-color: #673AB7;      /* Match the border color to the outline */
     outline-offset: 2px;        /* Creates extra spacing between the input and outline */
+}
+
+.input:focus {
+    border-color: #673AB7;
+    outline: none;
 }
 
 .zoom-button {
