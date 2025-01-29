@@ -1,7 +1,16 @@
 module Main exposing (..)
 
+{-|
+This is the main module of the application containing the entry point of the project.
+
+It manages:
+  - The overall app view.
+  - The state of the model (such as user input, parsed code, and customizations).
+  - User interaction (parsing code, changing colors, zooming, etc.).
+-}
+
 import Browser
-import DrawingUtils exposing (display)
+import DrawingUtils exposing (display, Color)
 import Html exposing (Html, button, div, h3, input, text)
 import Html.Attributes exposing (placeholder, value)
 import Html.Events exposing (onClick, onInput)
@@ -11,14 +20,20 @@ import Svg.Attributes
 import TcTurtle exposing (Program)
 
 
-
 -- MODEL
 
+{-|
+Defines the `Model` for the main application state.
 
-type alias Color =
-    { red : Int, green : Int, blue : Int, alpha : Float }
-
-
+Fields:
+  - `code` : String - The TcTurtle code entered by the user.
+  - `error` : Maybe String - Any error messages displayed during parsing.
+  - `svg` : Svg msg - The rendered SVG output based on parsed code.
+  - `color` : Color - The current drawing color.
+  - `program` : Maybe TcTurtle.Program - The parsed drawing instructions.
+  - `customRed`, `customGreen`, `customBlue`, `customAlpha`: Strings - User-entered custom color values.
+  - `zoom` : Float - The zoom level for SVG rendering.
+-}
 type alias Model msg =
     { code : String
     , error : Maybe String
@@ -32,7 +47,9 @@ type alias Model msg =
     , zoom : Float
     }
 
-
+{-|
+The initial state (model) of the application.
+-}
 init : Model Never
 init =
     { code = ""
@@ -48,10 +65,20 @@ init =
     }
 
 
-
 -- UPDATE
 
+{-|
+Messages (`Msg`) define the possible user interactions within the app.
 
+Variants:
+  - `UpdateCode`: Fired when the user updates the input TcTurtle code.
+  - `ParseCode`: Fired when the "Parse & Draw" button is clicked.
+  - `ChangeColor`: Fired when the user chooses a predefined color button.
+  - `UpdateCustomColor`: Fired when the custom color input fields are updated.
+  - `SetCustomColor`: Fired when the "Set Custom Color" button is clicked.
+  - `ZoomIn`: Fired to zoom into the SVG.
+  - `ZoomOut`: Fired to zoom out of the SVG.
+-}
 type Msg
     = UpdateCode String
     | ParseCode
@@ -61,13 +88,24 @@ type Msg
     | ZoomIn
     | ZoomOut
 
+{-|
+Handles app state updates based on `Msg`.
 
+Parameters:
+  - `msg`: The message triggered by user interaction.
+  - `model`: The current application state.
+
+Returns:
+  - An updated version of the `Model`.
+-}
 update : Msg -> Model Never -> Model Never
 update msg model =
     case msg of
+        -- Handle updating the code entered by the user
         UpdateCode newCode ->
             { model | code = newCode }
 
+        -- Handle the "Parse & Draw" event
         ParseCode ->
             case read model.code of
                 Ok program ->
@@ -84,6 +122,7 @@ update msg model =
                         , program = Nothing
                     }
 
+        -- Handle changing the drawing color
         ChangeColor newColor ->
             case model.program of
                 Just program ->
@@ -93,8 +132,9 @@ update msg model =
                     }
 
                 Nothing ->
-                    { model | color = newColor }
+                    { model | color = newColor } -- Update only the color if no program exists
 
+        -- Handle updating values in the custom color input fields
         UpdateCustomColor red green blue alpha ->
             { model
                 | customRed = red
@@ -103,6 +143,7 @@ update msg model =
                 , customAlpha = alpha
             }
 
+        -- Handle applying the custom color to the drawing
         SetCustomColor ->
             case model.program of
                 Just program ->
@@ -130,6 +171,7 @@ update msg model =
                     in
                     { model | color = newColor }
 
+        -- Handle zooming in the SVG
         ZoomIn ->
             case model.program of
                 Just program ->
@@ -141,6 +183,7 @@ update msg model =
                 Nothing ->
                     { model | zoom = model.zoom * 1.1 }
 
+        -- Handle zooming out the SVG
         ZoomOut ->
             case model.program of
                 Just program ->
@@ -153,28 +196,39 @@ update msg model =
                     { model | zoom = model.zoom * 0.9 }
 
 
-
 -- VIEW
 
+{-|
+Constructs the HTML structure of the app.
 
+Parameters:
+  - `model`: The current application state.
+
+Returns:
+  - The view (HTML) as a `Html Msg`.
+-}
 view : Model Never -> Html Msg
 view model =
     div [ Html.Attributes.class "page" ]
-        [ input
+        [ -- Input box for TcTurtle code
+          input
             [ placeholder "Enter TcTurtle code"
             , Html.Attributes.class "input"
             , onInput UpdateCode
             , value model.code
             ]
             []
-        , button
+        , -- "Parse & Draw" Button
+          button
             [ Html.Attributes.class "button"
             , onClick ParseCode
             ]
             [ text "Parse & Draw" ]
-        , div [ Html.Attributes.class "color-section" ]
+        , -- Color selection area
+          div [ Html.Attributes.class "color-section" ]
             [ h3 [ Html.Attributes.class "color-title small-font" ] [ text "Choose a color for your pencil:" ]
-            , div [ Html.Attributes.class "color-buttons" ]
+            , -- Predefined color buttons
+              div [ Html.Attributes.class "color-buttons" ]
                 [ button
                     [ Html.Attributes.class "color-button black"
                     , onClick (ChangeColor { red = 0, green = 0, blue = 0, alpha = 1.0 })
@@ -196,7 +250,8 @@ view model =
                     ]
                     [ text "Blue" ]
                 ]
-            , div [ Html.Attributes.class "custom-color" ]
+            , -- Custom color selection area
+              div [ Html.Attributes.class "custom-color" ]
                 [ text "Or decide the color you want:"
                 , div [ Html.Attributes.class "color-inputs" ]
                     [ input
@@ -237,12 +292,14 @@ view model =
                     ]
                 ]
             ]
-        , div [ Html.Attributes.class "zoom-controls" ]
+        , -- Zoom controls
+          div [ Html.Attributes.class "zoom-controls" ]
             [ text "Zoom Controls: "
             , button [ Html.Attributes.class "zoom-button", onClick ZoomIn ] [ text "+" ]
             , button [ Html.Attributes.class "zoom-button", onClick ZoomOut ] [ text "−" ]
             ]
-        , case model.error of
+        , -- SVG output or error message
+          case model.error of
             Nothing ->
                 div [ Html.Attributes.class "svg" ] [ Html.map (always ParseCode) model.svg ]
 
@@ -251,9 +308,12 @@ view model =
         ]
 
 
-
 -- PROGRAM
 
+{-|
+The entry point for the program using `Browser.sandbox`.
 
+Defines the main logic of the app by initializing, updating, and rendering the view.
+-}
 main =
     Browser.sandbox { init = init, update = update, view = view }

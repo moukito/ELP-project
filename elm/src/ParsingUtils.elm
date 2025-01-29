@@ -1,31 +1,57 @@
 module ParsingUtils exposing (parseErrorToString, programParser, read)
 
+{-|
+This module provides utilities for parsing TcTurtle programs, converting user input strings
+to structured `Program` data, and handling errors during the parsing process.
+
+Main functions:
+  - `programParser`: Parses a list of turtle instructions (`Program`).
+  - `read`: Entry point for parsing a string into a `Program`.
+  - `parseErrorToString`: Converts parsing errors to human-readable messages.
+
+Parsers for individual instructions are also included (e.g., `forwardParser`, `rightParser`, etc.).
+-}
+
 import Parser exposing (..)
 import TcTurtle exposing (..)
 
 
+-- PARSERS FOR INSTRUCTIONS
 
--- Parse individual instructions
-
-
+{-|
+Parses the `Forward` instruction, which moves the turtle forward by a specified number of units.
+Example syntax: `Forward 100`
+-}
 forwardParser : Parser Instruction
 forwardParser =
     succeed Forward
         |= (symbol "Forward" |> andThen (\_ -> spaces) |> andThen (\_ -> int))
 
 
+{-|
+Parses the `Left` instruction, which turns the turtle left by a specified angle in degrees.
+Example syntax: `Left 90`
+-}
 leftParser : Parser Instruction
 leftParser =
     succeed Left
         |= (symbol "Left" |> andThen (\_ -> spaces) |> andThen (\_ -> int))
 
 
+{-|
+Parses the `Right` instruction, which turns the turtle right by a specified angle in degrees.
+Example syntax: `Right 90`
+-}
 rightParser : Parser Instruction
 rightParser =
     succeed Right
         |= (symbol "Right" |> andThen (\_ -> spaces) |> andThen (\_ -> int))
 
 
+{-|
+Parses the `Repeat` instruction, which repeats a given sequence of instructions a specified number of times.
+Example syntax: `Repeat 4 [ Forward 100, Left 90 ]`
+-}
 repeatParser : Parser Instruction
 repeatParser =
     succeed Repeat
@@ -41,6 +67,9 @@ repeatParser =
            )
 
 
+{-|
+Parses any individual turtle instruction (`Forward`, `Left`, `Right`, or `Repeat`).
+-}
 instructionParser : Parser Instruction
 instructionParser =
     oneOf
@@ -51,10 +80,12 @@ instructionParser =
         ]
 
 
+-- PARSER FOR ENTIRE PROGRAM
 
--- Program parser: Parse entire program
-
-
+{-|
+Parses an entire list of instructions enclosed in brackets.
+Example syntax: `[ Forward 100, Left 90, Forward 50 ]`
+-}
 programParser : Parser TcTurtle.Program
 programParser =
     Parser.sequence
@@ -67,19 +98,33 @@ programParser =
         }
 
 
+-- ENTRY POINT
 
--- Entry point for parsing
+{-|
+Parses the user input string into a `Program`.
 
+Parameters:
+  - `input`: User input string.
 
+Returns:
+  - A `Result` containing either the parsed program or a list of parsing errors.
+-}
 read : String -> Result (List Parser.DeadEnd) TcTurtle.Program
 read input =
     run programParser input
 
 
+-- ERROR HANDLING
 
--- Error handling
+{-|
+Converts a list of parsing errors into a human-readable message.
 
+Parameters:
+  - `errors`: A list of `Parser.DeadEnd` values representing parsing errors.
 
+Returns:
+  - A string describing the first error in the list.
+-}
 parseErrorToString : List Parser.DeadEnd -> String
 parseErrorToString errors =
     case errors of
@@ -102,45 +147,3 @@ parseErrorToString errors =
 
                 _ ->
                     "Invalid syntax. Please check your program for errors."
-
-
-
--- Tests example
-
-
-executeCommand : Instruction -> String
-executeCommand command =
-    case command of
-        Forward distance ->
-            "Executing Forward with distance: " ++ String.fromInt distance
-
-        Left angle ->
-            "Executing Left with angle: " ++ String.fromInt angle
-
-        Right angle ->
-            "Executing Right with angle: " ++ String.fromInt angle
-
-        Repeat count commands ->
-            String.join "\n"
-                (List.concatMap (\_ -> List.map executeCommand commands) (List.repeat count ()))
-
-
-
-
-
-executeProgram : TcTurtle.Program -> String
-executeProgram program =
-    String.join "\n" (List.map executeCommand program)
-
-
-
-
-
-processInput : String -> String
-processInput input =
-    case run programParser input of
-        Ok program ->
-            executeProgram program
-
-        Err _ ->
-            "Invalid program"
