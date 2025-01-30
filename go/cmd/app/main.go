@@ -10,7 +10,7 @@ import (
 // Main Canny filter pipeline.
 func main() {
 	// Input/output paths
-	inputPath := "./go/input.jpg"
+	inputPath := "image2.jpg"
 	outputPath := "output.jpg"
 
 	// Load image
@@ -31,4 +31,9 @@ func main() {
 	}
 
 	fmt.Println("Canny filter applied and output saved to", outputPath)
+
+	img2 := utils.MaskOutsideCorners(edges, 128, 0.5)
+
+	imageUtils.SaveImage(img2, "image_with_corner.jpg", format)
+
 }
