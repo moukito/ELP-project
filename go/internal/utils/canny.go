@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 )
@@ -92,13 +93,16 @@ func isConnectedToStrong(img *image.Gray, x, y int, strong uint8) bool {
 	return false
 }
 
-func ApplyCannyEdgeDetection(img *image.Gray, lowThreshold, highThreshold float64) *image.Gray {
+func ApplyCannyEdgeDetection(img *image.Gray) *image.Gray {
 	// 1. Appliquer un flou Gaussien pour réduire le bruit
-	kernel := GenerateGaussianKernel(5, 1.4)
+	kernel := GenerateGaussianKernel(5 /*5*/, 1.4 /*1.4*/)
 	blurred := ApplyKernel(img, kernel)
 
+	lowThreshold, highThreshold := ComputeDynamicThresholds(blurred, 1.5)
+	fmt.Println(lowThreshold, highThreshold)
+
 	// 2. Appliquer le filtre de Sobel pour obtenir les gradients
-	sobelX, sobelY := GenerateSobelKernel(5)
+	sobelX, sobelY := GenerateSobelKernel(3)
 	edges, gradientAngles := ApplySobelEdgeDetection(blurred, sobelX, sobelY)
 
 	// 3. Suppression des non-maxima
