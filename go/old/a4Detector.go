@@ -1,6 +1,7 @@
-package utils
+package old
 
 import (
+	"ELP-project/internal/utils"
 	"image"
 	"image/color"
 	"math"
@@ -34,50 +35,8 @@ func convertToBinaryMatrix(img *image.Gray, threshold uint8) [][]int {
 	return binaryMatrix
 }
 
-// findContours apply DFS to find contours of A4
-func findContours(image [][]int) [][][]int {
-	height, width := len(image), len(image[0])
-	visited := make([][]bool, height)
-	for i := range visited {
-		visited[i] = make([]bool, width)
-	}
-
-	var contours [][][]int
-	directions := [][]int{{0, 1}, {1, 0}, {0, -1}, {-1, 0}}
-
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			if image[y][x] == 1 && !visited[y][x] {
-				contour := [][]int{}
-				stack := [][]int{{y, x}}
-
-				for len(stack) > 0 {
-					point := stack[len(stack)-1]
-					stack = stack[:len(stack)-1]
-					py, px := point[0], point[1]
-
-					if visited[py][px] {
-						continue
-					}
-					visited[py][px] = true
-					contour = append(contour, []int{px, py})
-
-					for _, d := range directions {
-						ny, nx := py+d[0], px+d[1]
-						if ny >= 0 && ny < height && nx >= 0 && nx < width && image[ny][nx] == 1 && !visited[ny][nx] {
-							stack = append(stack, []int{ny, nx})
-						}
-					}
-				}
-				contours = append(contours, contour)
-			}
-		}
-	}
-	return contours
-}
-
 // perpendicularDistance calculate the distance between one point and a line defined by two other points
-func perpendicularDistance(point, lineStart, lineEnd []int) float64 {
+func perpendicularDistanceOld(point, lineStart, lineEnd []int) float64 {
 	x0, y0 := float64(point[0]), float64(point[1])
 	x1, y1 := float64(lineStart[0]), float64(lineStart[1])
 	x2, y2 := float64(lineEnd[0]), float64(lineEnd[1])
@@ -97,7 +56,7 @@ func douglasPeucker(points [][]int, epsilon float64) [][]int {
 	index := 0
 
 	for i := 1; i < len(points)-1; i++ {
-		dist := perpendicularDistance(points[i], points[0], points[len(points)-1])
+		dist := perpendicularDistanceOld(points[i], points[0], points[len(points)-1])
 		if dist > maxDist {
 			maxDist = dist
 			index = i
@@ -202,7 +161,7 @@ func abs(x int) int {
 // MaskOutsideCorners mask all pixels which are outside rectangle
 func MaskOutsideCorners(img *image.Gray, threshold uint8, epsilon float64) *image.Gray {
 	binaryMatrix := convertToBinaryMatrix(img, threshold)
-	contours := findContours(binaryMatrix)
+	contours := utils.FindContoursDFS(binaryMatrix)
 	pointSet := pointSetAfterDouglasPeucker(contours, epsilon)
 	cornerA, cornerB, cornerC, cornerD := cornerConstructor(diagonal(pointSet))
 	bounds := img.Bounds()
