@@ -85,6 +85,32 @@ func normalizeKernel(kernel [][]float64) {
 	}
 }
 
+func ComputeDynamicThresholds(img *image.Gray, alpha float64) (float64, float64) {
+	bounds := img.Bounds()
+	totalGradient := 0.0
+	count := 0
+
+	// Appliquer Sobel pour obtenir la magnitude des gradients
+	sobelX, sobelY := GenerateSobelKernel(5)
+	gradient, _ := ApplySobelEdgeDetection(img, sobelX, sobelY)
+
+	// Calcul de la moyenne des gradients
+	for y := bounds.Min.Y + 1; y < bounds.Max.Y-1; y++ {
+		for x := bounds.Min.X + 1; x < bounds.Max.X-1; x++ {
+			totalGradient += float64(gradient.GrayAt(x, y).Y)
+			count++
+		}
+	}
+
+	meanGradient := totalGradient / float64(count)
+
+	// Définition des seuils bas et haut
+	highThreshold := alpha * meanGradient
+	lowThreshold := 0.4 * highThreshold
+
+	return lowThreshold, highThreshold
+}
+
 // ApplySobelEdgeDetection applique un noyau de Sobel dynamique
 func ApplySobelEdgeDetection(img *image.Gray, kernelX, kernelY [][]float64) (*image.Gray, [][]float64) {
 	bounds := img.Bounds()
