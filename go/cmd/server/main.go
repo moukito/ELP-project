@@ -3,6 +3,7 @@ package main
 import (
 	"ELP-project/internal/imageUtils"
 	"ELP-project/internal/utils"
+	"ELP-project/internal/worker"
 	"bytes"
 	"context"
 	"errors"
@@ -37,14 +38,6 @@ type Server struct {
 	stopCtx    context.Context
 	cancel     context.CancelFunc
 	numWorkers int
-}
-
-type Task struct {
-	conn       net.Conn    // Connection to the client
-	img        image.Image // Image received
-	err        error       // Error during processing
-	resultChan chan<- Task
-	function   func(image.Image) (image.Image, error)
 }
 
 // newServer create a new server instance
@@ -171,23 +164,8 @@ func (server *Server) sendImage(conn net.Conn, img image.Image, format string) {
 	log.Printf("Image sent successfully. Total bytes: %d", dataLen)
 }
 
-// startWorkerPool initializes a worker pool for the given stage.
-func (server *Server) startWorkerPool(name string, numWorkers int,
-	workerFunc func(Task, chan<- Task), inputChan <-chan Task, outputChan chan<- Task) {
-
-	for i := 0; i < numWorkers; i++ {
-		go func(workerID int) {
-			log.Printf("%s Worker %d started", name, workerID)
-			for task := range inputChan {
-				workerFunc(task, outputChan) // Process the task
-			}
-			log.Printf("%s Worker %d stopped", name, workerID)
-		}(i)
-	}
-}
-
 // handleConnection limits the number of simultaneous socket workers and dispatches tasks.
-func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, treatmentChan chan Task) {
+func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, treatmentChan chan worker.Task[image.Image, image.Image]) {
 	defer conn.Close()
 
 	// Limit the number of active socket workers using the semaphore
@@ -205,7 +183,7 @@ func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, 
 	}
 	log.Println("Image received successfully!")
 	// Create a dedicated result channel for this task
-	resultGrayChan := make(chan Task, 100)
+	resultGrayChan := make(chan worker.Task[image.Image, image.Image], 100)
 
 	// Convert the received image to a concrete type that supports SubImage
 	rgbaImg, ok := img.(*image.RGBA)
@@ -244,29 +222,29 @@ func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, 
 		}
 
 		// Create and submit a task for the subimage
-		task := Task{
-			conn:       conn,
-			img:        subImage,
-			resultChan: resultGrayChan,
-			function:   GrayscaleWrapper,
+		task := worker.Task[image.Image, image.Image]{
+			Conn:       conn,
+			Input:      subImage,
+			ResultChan: resultGrayChan,
+			Function:   GrayscaleWrapper,
 		}
 		treatmentChan <- task
 	}
 
-	resultCannyChan := make(chan Task, 100)
+	resultCannyChan := make(chan worker.Task[image.Image, image.Image], 100)
 
 	for i := 0; i < server.numWorkers; i++ {
 		select {
 		case result := <-resultGrayChan: // Get the processed task back (if applicable)
-			if result.err != nil {
-				log.Printf("Error processing image for %s: %v", conn.RemoteAddr(), result.err)
+			if result.Err != nil {
+				log.Printf("Error processing image for %s: %v", conn.RemoteAddr(), result.Err)
 				return
 			}
-			task := Task{
-				conn:       conn,
-				img:        result.img,
-				resultChan: resultCannyChan,
-				function:   ApplyCannyEdgeDetectionWrapper,
+			task := worker.Task[image.Image, image.Image]{
+				Conn:       conn,
+				Input:      result.Output,
+				ResultChan: resultCannyChan,
+				Function:   ApplyCannyEdgeDetectionWrapper,
 			}
 			treatmentChan <- task
 		case <-server.stopCtx.Done(): // Handle shutdown gracefully
@@ -282,11 +260,11 @@ func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, 
 	for i := 0; i < server.numWorkers; i++ {
 		select {
 		case result := <-resultCannyChan: // Get the processed task back
-			if result.err != nil {
-				log.Printf("Error processing image for %s: %v", conn.RemoteAddr(), result.err)
+			if result.Err != nil {
+				log.Printf("Error processing image for %s: %v", conn.RemoteAddr(), result.Err)
 				return
 			}
-			results[i] = result.img.(*image.Gray)
+			results[i] = result.Output.(*image.Gray)
 		case <-server.stopCtx.Done(): // Handle shutdown gracefully
 			log.Println("Server is shutting down, closing connection.")
 			return
@@ -313,41 +291,13 @@ func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, 
 }
 
 func ApplyCannyEdgeDetectionWrapper(img image.Image) (image.Image, error) {
-	return utils.ApplyCannyEdgeDetection(img.(*image.Gray), 50, 150), nil
+	return utils.ApplyCannyEdgeDetection(img.(*image.Gray)), nil
 }
 
 func GrayscaleWrapper(img image.Image) (image.Image, error) {
 	return imageUtils.Grayscale(img), nil
 }
 
-// treatmentWorker processes the task and sends it back to the result channel.
-func (server *Server) treatmentWorker(task Task, _ chan<- Task) {
-	log.Printf("Processing task for connection: %v", task.conn.RemoteAddr())
-
-	// Ensure a function is assigned to the task
-	if task.function == nil {
-		task.err = errors.New("no processing function provided")
-		if task.resultChan != nil {
-			task.resultChan <- task
-			close(task.resultChan)
-		}
-		log.Printf("No function provided for task from: %v", task.conn.RemoteAddr())
-		return
-	}
-
-	// Execute the provided function
-	processedImg, err := task.function(task.img)
-	task.img = processedImg
-	task.err = err
-
-	// Send the processed task to the output channel
-	if task.resultChan != nil {
-		task.resultChan <- task
-	}
-	log.Printf("Task processing completed for connection: %v", task.conn.RemoteAddr())
-}
-
-// todo : check if wait needed
 // todo : reformat code
 // run executes the workflow of the server: listening a file, receiving the file over the connection, treating the image, and sending the image back to client.
 func (server *Server) run() {
@@ -363,11 +313,11 @@ func (server *Server) run() {
 	fmt.Println("The server is running... (Press Ctrl + C to stop)")
 
 	// Channels for managing concurrent workers
-	socketSemaphore := make(chan net.Conn, 5) // Limit to 5 concurrent connections
-	treatmentChan := make(chan Task, 100)     // Treatment task channel
+	socketSemaphore := make(chan net.Conn, 5)                              // Limit to 5 concurrent connections
+	treatmentChan := make(chan worker.Task[image.Image, image.Image], 100) // Treatment task channel
 
 	// Start worker pools
-	go server.startWorkerPool("Treatment Worker", numWorkers, server.treatmentWorker, treatmentChan, nil)
+	go worker.StartWorkerPool("Treatment Worker", numWorkers, worker.TreatmentWorker, treatmentChan)
 
 	// Use a goroutine to listen for server stop signals
 	go func() {
