@@ -35,7 +35,7 @@ var numWorkers = runtime.NumCPU()
 type workerChannels struct {
 	socketSemaphore       chan net.Conn
 	imageChan             chan worker.Task[image.Image, image.Image]
-	bfsChan               chan worker.Task[image.Gray, []geometry.Contour]
+	bfsChan               chan worker.Task[image.Rectangle, []geometry.Contour]
 	findQuadrilateralChan chan worker.Task[[]geometry.Contour, geometry.ContourWithArea]
 }
 
@@ -291,31 +291,47 @@ func (server *Server) handleConnection(conn net.Conn, workerChannels workerChann
 		draw.Draw(cannyImage, image.Rect(bounds.Min.X, startY, bounds.Max.X, startY+chunkHeight), chunk, image.Point{X: bounds.Min.X, Y: startY}, draw.Src)
 	}
 
-	resultBfsChan := make(chan worker.Task[image.Gray, []geometry.Contour], 100)
+	resultBfsChan := make(chan worker.Task[image.Rectangle, []geometry.Contour], 100)
 
-	task2 := worker.Task[image.Gray, []geometry.Contour]{
-		Conn:       conn,
-		Input:      *cannyImage,
-		ResultChan: resultBfsChan,
-		Function:   FindContoursBFSWrapper,
+	FindContoursBFSWrapper := func(rect image.Rectangle) ([]geometry.Contour, error) {
+		return utils.FindContoursBFS(cannyImage, rect), nil
 	}
-	workerChannels.bfsChan <- task2
+
+	for i := 0; i < server.numWorkers; i++ {
+		startY := bounds.Min.Y + i*chunkSize
+		endY := startY + chunkSize
+
+		if endY > bounds.Max.Y {
+			endY = bounds.Max.Y
+		}
+
+		rect := image.Rect(bounds.Min.X, startY, bounds.Max.X, endY)
+
+		task := worker.Task[image.Rectangle, []geometry.Contour]{
+			Conn:       conn,
+			Input:      rect,
+			ResultChan: resultBfsChan,
+			Function:   FindContoursBFSWrapper,
+		}
+		workerChannels.bfsChan <- task
+	}
 
 	bfsResult := make([]geometry.Contour, 0)
-	for i := 0; i < 1; /*todo server.numWorkers*/ i++ {
+	for i := 0; i < server.numWorkers; i++ {
 		select {
 		case result := <-resultBfsChan:
 			if result.Err != nil {
 				log.Printf("Error processing image for %s: %v", conn.RemoteAddr(), result.Err)
 				return
 			}
-			bfsResult = result.Output
+			bfsResult = append(bfsResult, result.Output...)
 		case <-server.stopCtx.Done(): // Handle shutdown gracefully
 			log.Println("Server is shutting down, closing connection.")
 			return
 		}
 	}
 	close(resultBfsChan)
+	fmt.Println(len(bfsResult))
 
 	resultFindQuadrilateralChan := make(chan worker.Task[[]geometry.Contour, geometry.ContourWithArea], 100)
 	for i := 0; i < numWorkers; i++ {
@@ -379,10 +395,6 @@ func FindQuadrilateralWrapper(contours []geometry.Contour) (geometry.ContourWith
 	return utils.FindQuadrilateral(contours), nil
 }
 
-func FindContoursBFSWrapper(gray image.Gray) ([]geometry.Contour, error) {
-	return utils.FindContoursBFS(&gray), nil
-}
-
 func ApplyCannyEdgeDetectionWrapper(img image.Image) (image.Image, error) {
 	return utils.ApplyCannyEdgeDetection(img.(*image.Gray)), nil
 }
@@ -408,7 +420,7 @@ func (server *Server) run() {
 	// Channels for managing concurrent workers
 	socketSemaphore := make(chan net.Conn, 5)
 	imageChan := make(chan worker.Task[image.Image, image.Image], 100)
-	bfsChan := make(chan worker.Task[image.Gray, []geometry.Contour], 100)
+	bfsChan := make(chan worker.Task[image.Rectangle, []geometry.Contour], 100)
 	findQuadrilateralChan := make(chan worker.Task[[]geometry.Contour, geometry.ContourWithArea], 100)
 
 	channels := workerChannels{
