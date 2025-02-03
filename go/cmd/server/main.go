@@ -1,6 +1,7 @@
 package main
 
 import (
+	"ELP-project/internal/geometry"
 	"ELP-project/internal/imageUtils"
 	"ELP-project/internal/utils"
 	"ELP-project/internal/worker"
@@ -30,6 +31,13 @@ const (
 )
 
 var numWorkers = runtime.NumCPU()
+
+type workerChannels struct {
+	socketSemaphore       chan net.Conn
+	imageChan             chan worker.Task[image.Image, image.Image]
+	bfsChan               chan worker.Task[image.Gray, []geometry.Contour]
+	findQuadrilateralChan chan worker.Task[[]geometry.Contour, geometry.ContourWithArea]
+}
 
 // Server is a struct that encapsulates logic for handling TCP connections.
 type Server struct {
@@ -165,12 +173,12 @@ func (server *Server) sendImage(conn net.Conn, img image.Image, format string) {
 }
 
 // handleConnection limits the number of simultaneous socket workers and dispatches tasks.
-func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, treatmentChan chan worker.Task[image.Image, image.Image]) {
+func (server *Server) handleConnection(conn net.Conn, workerChannels workerChannels) {
 	defer conn.Close()
 
 	// Limit the number of active socket workers using the semaphore
-	socketChan <- conn
-	defer func() { <-socketChan }() // Release semaphore when done
+	workerChannels.socketSemaphore <- conn
+	defer func() { <-workerChannels.socketSemaphore }() // Release semaphore when done
 
 	log.Printf("New connection from %s", conn.RemoteAddr())
 
@@ -228,14 +236,14 @@ func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, 
 			ResultChan: resultGrayChan,
 			Function:   GrayscaleWrapper,
 		}
-		treatmentChan <- task
+		workerChannels.imageChan <- task
 	}
 
 	resultCannyChan := make(chan worker.Task[image.Image, image.Image], 100)
 
 	for i := 0; i < server.numWorkers; i++ {
 		select {
-		case result := <-resultGrayChan: // Get the processed task back (if applicable)
+		case result := <-resultGrayChan:
 			if result.Err != nil {
 				log.Printf("Error processing image for %s: %v", conn.RemoteAddr(), result.Err)
 				return
@@ -246,7 +254,7 @@ func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, 
 				ResultChan: resultCannyChan,
 				Function:   ApplyCannyEdgeDetectionWrapper,
 			}
-			treatmentChan <- task
+			workerChannels.imageChan <- task
 		case <-server.stopCtx.Done(): // Handle shutdown gracefully
 			log.Println("Server is shutting down, closing connection.")
 			return
@@ -254,12 +262,12 @@ func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, 
 	}
 	close(resultGrayChan)
 
-	// Wait for all results and assemble the final image
+	// Wait for all results and assemble the full image
 	results := make([]*image.Gray, server.numWorkers)
 
 	for i := 0; i < server.numWorkers; i++ {
 		select {
-		case result := <-resultCannyChan: // Get the processed task back
+		case result := <-resultCannyChan:
 			if result.Err != nil {
 				log.Printf("Error processing image for %s: %v", conn.RemoteAddr(), result.Err)
 				return
@@ -272,22 +280,107 @@ func (server *Server) handleConnection(conn net.Conn, socketChan chan net.Conn, 
 	}
 	close(resultCannyChan)
 
-	// Sort the results by the Y-coordinate (Min.Y) of their bounds
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].Rect.Min.Y < results[j].Rect.Min.Y
 	})
 
-	// Assemble the final image from chunks
-	finalImage := image.NewGray(bounds)
+	cannyImage := image.NewGray(bounds)
 	for i, chunk := range results {
 		startY := bounds.Min.Y + i*chunkSize
-		// Get the height of this specific chunk
 		chunkHeight := chunk.Rect.Dy() - overlapSize
-		draw.Draw(finalImage, image.Rect(bounds.Min.X, startY, bounds.Max.X, startY+chunkHeight), chunk, image.Point{X: bounds.Min.X, Y: startY}, draw.Src)
+		draw.Draw(cannyImage, image.Rect(bounds.Min.X, startY, bounds.Max.X, startY+chunkHeight), chunk, image.Point{X: bounds.Min.X, Y: startY}, draw.Src)
 	}
+
+	resultBfsChan := make(chan worker.Task[image.Gray, []geometry.Contour], 100)
+
+	task2 := worker.Task[image.Gray, []geometry.Contour]{
+		Conn:       conn,
+		Input:      *cannyImage,
+		ResultChan: resultBfsChan,
+		Function:   FindContoursBFSWrapper,
+	}
+	workerChannels.bfsChan <- task2
+
+	bfsResult := make([]geometry.Contour, 0)
+	for i := 0; i < 1; /*todo server.numWorkers*/ i++ {
+		select {
+		case result := <-resultBfsChan:
+			if result.Err != nil {
+				log.Printf("Error processing image for %s: %v", conn.RemoteAddr(), result.Err)
+				return
+			}
+			bfsResult = result.Output
+		case <-server.stopCtx.Done(): // Handle shutdown gracefully
+			log.Println("Server is shutting down, closing connection.")
+			return
+		}
+	}
+	close(resultBfsChan)
+
+	resultFindQuadrilateralChan := make(chan worker.Task[[]geometry.Contour, geometry.ContourWithArea], 100)
+	for i := 0; i < numWorkers; i++ {
+		start := i * (len(bfsResult) / numWorkers)
+		end := (i + 1) * (len(bfsResult) / numWorkers)
+
+		if i == numWorkers-1 {
+			end = len(bfsResult)
+		}
+
+		task := worker.Task[[]geometry.Contour, geometry.ContourWithArea]{
+			Conn:       conn,
+			Input:      bfsResult[start:end],
+			ResultChan: resultFindQuadrilateralChan,
+			Function:   FindQuadrilateralWrapper,
+		}
+		workerChannels.findQuadrilateralChan <- task
+	}
+
+	findQuadrilateralResult := make([]geometry.ContourWithArea, 0)
+	for i := 0; i < server.numWorkers; i++ {
+		select {
+		case result := <-resultFindQuadrilateralChan:
+			if result.Err != nil {
+				log.Printf("Error processing image for %s: %v", conn.RemoteAddr(), result.Err)
+				return
+			}
+			findQuadrilateralResult = append(findQuadrilateralResult, result.Output)
+		case <-server.stopCtx.Done(): // Handle shutdown gracefully
+			log.Println("Server is shutting down, closing connection.")
+			return
+		}
+	}
+	close(resultFindQuadrilateralChan)
+
+	contourA4 := geometry.ContourWithArea{
+		Area: 0,
+	}
+	for _, contour := range findQuadrilateralResult {
+		if contour.Area > contourA4.Area {
+			contourA4 = contour
+		}
+	}
+
+	center := geometry.Point{
+		X: img.Bounds().Dx() / 2,
+		Y: img.Bounds().Dy() / 2,
+	}
+	contourA4.Contour = utils.FindCorner(contourA4.Contour, center)
+
+	rect := image.Rect(contourA4.Contour[0].X, contourA4.Contour[0].Y, contourA4.Contour[1].X, contourA4.Contour[1].Y)
+	finalImage := image.NewRGBA(rect)
+	draw.Draw(finalImage, rect, img, image.Pt(contourA4.Contour[0].X, contourA4.Contour[0].Y), draw.Src)
+
 	log.Printf("Sending processed image back to %s", conn.RemoteAddr())
 	server.sendImage(conn, finalImage, format)
 	log.Println("Connection finished:", conn.RemoteAddr())
+}
+
+func FindQuadrilateralWrapper(contours []geometry.Contour) (geometry.ContourWithArea, error) {
+	return utils.FindQuadrilateral(contours), nil
+}
+
+func FindContoursBFSWrapper(gray image.Gray) ([]geometry.Contour, error) {
+	return utils.FindContoursBFS(&gray), nil
 }
 
 func ApplyCannyEdgeDetectionWrapper(img image.Image) (image.Image, error) {
@@ -313,11 +406,22 @@ func (server *Server) run() {
 	fmt.Println("The server is running... (Press Ctrl + C to stop)")
 
 	// Channels for managing concurrent workers
-	socketSemaphore := make(chan net.Conn, 5)                              // Limit to 5 concurrent connections
-	treatmentChan := make(chan worker.Task[image.Image, image.Image], 100) // Treatment task channel
+	socketSemaphore := make(chan net.Conn, 5)
+	imageChan := make(chan worker.Task[image.Image, image.Image], 100)
+	bfsChan := make(chan worker.Task[image.Gray, []geometry.Contour], 100)
+	findQuadrilateralChan := make(chan worker.Task[[]geometry.Contour, geometry.ContourWithArea], 100)
+
+	channels := workerChannels{
+		socketSemaphore:       socketSemaphore,
+		imageChan:             imageChan,
+		bfsChan:               bfsChan,
+		findQuadrilateralChan: findQuadrilateralChan,
+	}
 
 	// Start worker pools
-	go worker.StartWorkerPool("Treatment Worker", numWorkers, worker.TreatmentWorker, treatmentChan)
+	go worker.StartWorkerPool("Image Worker", numWorkers, worker.TreatmentWorker, imageChan)
+	go worker.StartWorkerPool("BFS worker", numWorkers, worker.TreatmentWorker, bfsChan)
+	go worker.StartWorkerPool("FindQuadrilateral worker", numWorkers, worker.TreatmentWorker, findQuadrilateralChan)
 
 	// Use a goroutine to listen for server stop signals
 	go func() {
@@ -329,7 +433,9 @@ func (server *Server) run() {
 			return
 		}
 		close(socketSemaphore)
-		close(treatmentChan)
+		close(imageChan)
+		close(bfsChan)
+		close(findQuadrilateralChan)
 		log.Println("All workers will stop after completing their tasks.")
 
 	}()
@@ -353,7 +459,7 @@ func (server *Server) run() {
 			log.Println("Server is shutting down, closing new connection.")
 			conn.Close()
 		default:
-			go server.handleConnection(conn, socketSemaphore, treatmentChan)
+			go server.handleConnection(conn, channels)
 		}
 	}
 }
