@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"fmt"
 	"image"
 	"image/color"
 )
@@ -99,7 +98,6 @@ func ApplyCannyEdgeDetection(img *image.Gray) *image.Gray {
 	blurred := ApplyKernel(img, kernel)
 
 	lowThreshold, highThreshold := ComputeDynamicThresholds(blurred, 1.5)
-	fmt.Println(lowThreshold, highThreshold)
 
 	// 2. Appliquer le filtre de Sobel pour obtenir les gradients
 	sobelX, sobelY := GenerateSobelKernel(3)
