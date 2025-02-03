@@ -40,7 +40,7 @@ func main() {
 
 	contours := utils.FindContoursBFS(edges)
 	contourComplet := utils.FindQuadrilateral(contours)
-	fmt.Println(len(contourComplet))
+	fmt.Println(len(contourComplet.Contour))
 
 	/*if len(contourA4) != 4 {
 		fmt.Println("No contour found.")
@@ -48,7 +48,7 @@ func main() {
 	}*/
 
 	// Sauvegarder l'image avec le contour dessiné
-	contourImg := utils.DrawContour(img, contourComplet)
+	contourImg := utils.DrawContour(img, contourComplet.Contour)
 	outFile, err := os.Create("contour_detected.jpg")
 	if err != nil {
 		fmt.Println("Erreur de création :", err)
@@ -74,30 +74,30 @@ func main() {
 		X: 1500,
 		Y: 2000,
 	}
-	for contour := range contourComplet {
-		if contourComplet[contour].X < corner1.X {
-			corner1.X = contourComplet[contour].X
+	for contour := range contourComplet.Contour {
+		if contourComplet.Contour[contour].X < corner1.X {
+			corner1.X = contourComplet.Contour[contour].X
 		}
-		if contourComplet[contour].Y < corner1.Y {
-			corner1.Y = contourComplet[contour].Y
+		if contourComplet.Contour[contour].Y < corner1.Y {
+			corner1.Y = contourComplet.Contour[contour].Y
 		}
-		if contourComplet[contour].X > corner2.X {
-			corner2.X = contourComplet[contour].X
+		if contourComplet.Contour[contour].X > corner2.X {
+			corner2.X = contourComplet.Contour[contour].X
 		}
-		if contourComplet[contour].Y < corner2.Y {
-			corner2.Y = contourComplet[contour].Y
+		if contourComplet.Contour[contour].Y < corner2.Y {
+			corner2.Y = contourComplet.Contour[contour].Y
 		}
-		if contourComplet[contour].X < corner3.X {
-			corner3.X = contourComplet[contour].X
+		if contourComplet.Contour[contour].X < corner3.X {
+			corner3.X = contourComplet.Contour[contour].X
 		}
-		if contourComplet[contour].Y > corner3.Y {
-			corner3.Y = contourComplet[contour].Y
+		if contourComplet.Contour[contour].Y > corner3.Y {
+			corner3.Y = contourComplet.Contour[contour].Y
 		}
-		if contourComplet[contour].X > corner4.X {
-			corner4.X = contourComplet[contour].X
+		if contourComplet.Contour[contour].X > corner4.X {
+			corner4.X = contourComplet.Contour[contour].X
 		}
-		if contourComplet[contour].Y > corner4.Y {
-			corner4.Y = contourComplet[contour].Y
+		if contourComplet.Contour[contour].Y > corner4.Y {
+			corner4.Y = contourComplet.Contour[contour].Y
 		}
 	}
 	contourA4 := geometry.Contour{

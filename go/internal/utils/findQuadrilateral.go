@@ -5,23 +5,22 @@ import (
 	"math"
 )
 
-func FindQuadrilateral(contours []geometry.Contour) geometry.Contour {
+func FindQuadrilateral(contours []geometry.Contour) geometry.ContourWithArea {
 	var bestQuad geometry.Contour
 	maxArea := 0.0
 
 	for _, contour := range contours {
 		//preprocessed := reduceByDistance(contour, 10.0) // Minimum 10 pixels de distance entre points
 		//approx := DouglasPucker(contour /*preprocessed*/, 50.0)
-		approx := contour
 		if true /*len(approx) == 4*/ {
-			area := polygonArea(approx)
+			area := polygonArea(contour /*approx*/)
 			if area > maxArea {
 				maxArea = area
-				bestQuad = approx
+				bestQuad = contour /*approx*/
 			}
 		}
 	}
-	return bestQuad
+	return geometry.ContourWithArea{Contour: bestQuad, Area: maxArea}
 }
 
 func polygonArea(points geometry.Contour) float64 {
