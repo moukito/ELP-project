@@ -11,8 +11,11 @@ var directions = []geometry.Point{
 	{0, 1}, {1, 0}, {0, -1}, {-1, 0}, {-1, -1}, {-1, 1}, {1, -1}, {1, 1},
 }
 
-func FindContoursBFS(img *image.Gray) []geometry.Contour {
-	bounds := img.Bounds()
+func FindContoursBFSWithDefault(img *image.Gray) []geometry.Contour {
+	return FindContoursBFS(img, img.Bounds())
+}
+
+func FindContoursBFS(img *image.Gray, bounds image.Rectangle) []geometry.Contour {
 	visited := make(map[geometry.Point]bool)
 	var contours []geometry.Contour
 
@@ -36,9 +39,7 @@ func FindContoursBFS(img *image.Gray) []geometry.Contour {
 
 					for _, d := range directions {
 						neighbor := geometry.Point{X: curr.X + d.X, Y: curr.Y + d.Y}
-						if neighbor.X >= bounds.Min.X && neighbor.X < bounds.Max.X &&
-							neighbor.Y >= bounds.Min.Y && neighbor.Y < bounds.Max.Y &&
-							imageUtils.IsWhite(img, neighbor.X, neighbor.Y) && !visited[neighbor] {
+						if imageUtils.IsWhite(img, neighbor.X, neighbor.Y) && !visited[neighbor] {
 							queue = append(queue, neighbor)
 						}
 					}

@@ -38,7 +38,7 @@ func main() {
 	jpeg.Encode(edgesFile, edges, nil)
 	fmt.Println("Edges saved to edges.jpg")
 
-	contours := utils.FindContoursBFS(edges)
+	contours := utils.FindContoursBFSWithDefault(edges)
 	contourComplet := utils.FindQuadrilateral(contours)
 	fmt.Println(len(contourComplet.Contour))
 
