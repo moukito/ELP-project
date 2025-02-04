@@ -1,5 +1,136 @@
 package main
 
+/*
+Package main implements a TCP server designed for distributed image processing using a worker pool architecture.
+The server supports concurrent image processing tasks such as grayscale transformation, edge detection, and geometry computation.
+
+---
+
+### Features
+1. **TCP Communication**:
+   - Handles incoming connections from clients.
+   - Receives image data over TCP.
+   - Sends the processed image back to the client.
+
+2. **Worker Pool**:
+   - Utilizes a worker pool to process tasks concurrently.
+   - Supports tasks like grayscale image transformation, edge detection, and contour finding.
+
+3. **Image Processing Pipeline**:
+   - Processes images in chunks for efficient parallelism.
+   - Tasks include:
+     - Grayscale conversion.
+     - Canny edge detection.
+     - Contour finding and quadrilateral detection.
+
+---
+
+### Constants
+- `host` (string): Host address for the server (default: localhost).
+- `port` (string): Port for the server (default: 14750).
+- `protocol` (string): Communication protocol (default: TCP).
+- `bufferSize` (int): Size of the buffer used for TCP communication.
+- `overlapSize` (int): Overlap size between chunks of image processing.
+- `numWorkers` (int): Number of workers in the worker pool (defaults to the number of CPU cores).
+
+---
+
+### Structures
+#### `workerChannels`
+Represents the channels used for communication between tasks and workers.
+- Fields:
+  - `socketSemaphore`: Used to limit simultaneous socket connections.
+  - `imageChan`: Tasks for image transformation (e.g., grayscale, edge detection).
+  - `bfsChan`: Tasks for finding contours using BFS.
+  - `findQuadrilateralChan`: Tasks for detecting quadrilaterals from contours.
+
+#### `Server`
+Represents the TCP server.
+- Fields:
+  - `host`: Host address for the server.
+  - `port`: Port for the server.
+  - `stopCtx`: Context to signal server shutdown.
+  - `cancel`: Callback function to trigger the context cancellation.
+  - `numWorkers`: Number of concurrent workers.
+
+- Methods:
+  - `listen()`: Starts listening on the specified host and port.
+  - `receiveImage(conn net.Conn)`: Receives and decodes an image from the connection.
+  - `sendImage(conn net.Conn, img image.Image, format string)`: Encodes and sends an image to the client.
+  - `handleConnection(conn net.Conn, workerChannels workerChannels)`: Manages the entire image processing pipeline for a TCP connection.
+  - `run()`: Main loop for accepting and managing connections.
+  - `newServer(host string, port string, numWorkers int) *Server`: Initializes a new server instance.
+
+---
+
+### Workflow
+1. **Connection Handling**:
+   - Begins by listening on the specified `host` and `port`.
+   - Accepts incoming TCP connections.
+   - Receives the image data from the client using `receiveImage`.
+
+2. **Image Processing**:
+   - Splits the image into chunks for parallel processing by workers.
+   - Chunks are processed in stages:
+     - Grayscale transformation.
+     - Canny edge detection.
+     - Contour and quadrilateral detection.
+
+3. **Result Aggregation**:
+   - Combines processed chunks into the final output image.
+   - Sends the final processed image back to the client using `sendImage`.
+
+4. **Worker Pool**:
+   - Uses multiple worker pools for different computations (e.g., grayscale conversion, BFS for contours).
+   - Tasks are distributed to workers via channels.
+
+5. **Graceful Shutdown**:
+   - Listens for an interrupt signal (e.g., CTRL + C).
+   - Stops accepting new connections and gracefully shuts down.
+
+---
+
+### Key Image Processing Functions
+#### `GrayscaleWrapper(img image.Image) (image.Image, error)`
+Converts an image to grayscale using a utility function.
+
+#### `ApplyCannyEdgeDetectionWrapper(img image.Image) (image.Image, error)`
+Applies Canny edge detection to a grayscale image.
+
+#### `FindQuadrilateralWrapper(contours []geometry.Contour) (geometry.ContourWithArea, error)`
+Finds the largest quadrilateral from a set of contours.
+
+---
+
+### Logging
+- Logs server events to `server.log`.
+- Important logs include:
+  - Server start and shutdown.
+  - New connections.
+  - Errors during image processing.
+  - Task completion and results.
+
+---
+
+### Example Usage:
+1. Start the server with:
+   ```
+   go run main.go
+   ```
+
+2. Connect to the server using a TCP client and send an image for processing.
+
+3. Processed image is returned to the client.
+
+---
+
+### Dependencies
+- **geometry**: Used for contour and geometric computations.
+- **imageUtils**: Provides utility functions for image transformations.
+- **utils**: Contains advanced image processing algorithms like edge detection and contour extraction.
+- **worker**: Manages task distribution and the worker pool.
+*/
+
 import (
 	"ELP-project/internal/geometry"
 	"ELP-project/internal/imageUtils"
@@ -39,7 +170,6 @@ type workerChannels struct {
 	findQuadrilateralChan chan worker.Task[[]geometry.Contour, geometry.ContourWithArea]
 }
 
-// Server is a struct that encapsulates logic for handling TCP connections.
 type Server struct {
 	host       string
 	port       string
@@ -48,7 +178,6 @@ type Server struct {
 	numWorkers int
 }
 
-// newServer create a new server instance
 func newServer(host string, port string, numWorkers int) *Server {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Server{
@@ -60,7 +189,6 @@ func newServer(host string, port string, numWorkers int) *Server {
 	}
 }
 
-// listen sets up a server to listen for incoming connections.
 func (server *Server) listen() net.Listener {
 	listener, err := net.Listen(protocol, fmt.Sprintf("%s:%s", server.host, server.port))
 	if err != nil {
@@ -71,39 +199,30 @@ func (server *Server) listen() net.Listener {
 	return listener
 }
 
-// receiveImage handles receiving an image over a connection.
 func (server *Server) receiveImage(conn net.Conn) (image.Image, string) {
-	// Create a buffer to store the incoming data
 	var dataBuffer bytes.Buffer
-	buffer := make([]byte, bufferSize) // Temporary buffer size for chunks
+	buffer := make([]byte, bufferSize)
 
 	for {
-		// Read incoming data into the temporary buffer
 		n, err := conn.Read(buffer)
 		if err != nil {
 			log.Println(err.Error())
 			if err.Error() == "EOF" || err == io.EOF {
-				// End of data, break the loop
 				break
 			}
-			// Handle unexpected errors
 			log.Fatalf("Error reading from connection: %v", err)
 		}
 
-		// Write the received chunk to the data buffer
 		dataBuffer.Write(buffer[:n])
 
-		// Check for delimiter (e.g., "EOF")
 		if bytes.Contains(dataBuffer.Bytes(), []byte("EOF")) {
 			log.Println("End of data detected.")
 			break
 		}
 	}
-	// Remove the delimiter
 	data := dataBuffer.Bytes()
 	data = bytes.TrimSuffix(data, []byte("EOF"))
 
-	// Decode the accumulated data into an image.Image
 	img, format, err := image.Decode(&dataBuffer)
 	if err != nil {
 		log.Fatalf("Error decoding image: %v", err)
@@ -113,12 +232,9 @@ func (server *Server) receiveImage(conn net.Conn) (image.Image, string) {
 	return img, format
 }
 
-// imageToBuffer converts an image into a byte buffer based on the provided format.
 func imageToBuffer(img image.Image, format string) (*bytes.Buffer, error) {
-	// Create a new bytes.Buffer
 	var buffer bytes.Buffer
 
-	// Encode the image into the buffer
 	switch format {
 	case "jpeg":
 		err := jpeg.Encode(&buffer, img, nil)
@@ -134,55 +250,44 @@ func imageToBuffer(img image.Image, format string) (*bytes.Buffer, error) {
 		log.Fatalf("unsupported format: %v", format)
 	}
 
-	// Return the resulting buffer
 	return &buffer, nil
 }
 
-// sendImage handles sending an image based on its provided format over a connection.
 func (server *Server) sendImage(conn net.Conn, img image.Image, format string) {
-	// Use a buffer to encode the image
 	buffer, err := imageToBuffer(img, format)
 	if err != nil {
 		log.Fatalf("Error encoding image: %v", err)
 	}
 
-	// Send the data from the buffer in chunks
 	data := buffer.Bytes()
 	dataLen := len(data)
 	sent := 0
 
-	// Send the entire buffer content in chunks
 	for sent < dataLen {
-		// Determine the number of bytes to send in this chunk
-		chunkSize := bufferSize // e.g., 1024 bytes
+		chunkSize := bufferSize
 		if dataLen-sent < bufferSize {
 			chunkSize = dataLen - sent
 		}
 
-		// Write the chunk to the connection
 		n, err := conn.Write(data[sent : sent+chunkSize])
 		if err != nil {
 			log.Fatalf("Error sending data: %v", err)
 		}
 
-		// Advance the cursor position
 		sent += n
 	}
 
 	log.Printf("Image sent successfully. Total bytes: %d", dataLen)
 }
 
-// handleConnection limits the number of simultaneous socket workers and dispatches tasks.
 func (server *Server) handleConnection(conn net.Conn, workerChannels workerChannels) {
 	defer conn.Close()
 
-	// Limit the number of active socket workers using the semaphore
 	workerChannels.socketSemaphore <- conn
-	defer func() { <-workerChannels.socketSemaphore }() // Release semaphore when done
+	defer func() { <-workerChannels.socketSemaphore }()
 
 	log.Printf("New connection from %s", conn.RemoteAddr())
 
-	// Receive image over the connection
 	log.Println("Receiving image...")
 	img, format := server.receiveImage(conn)
 	if img == nil {
@@ -190,24 +295,19 @@ func (server *Server) handleConnection(conn net.Conn, workerChannels workerChann
 		return
 	}
 	log.Println("Image received successfully!")
-	// Create a dedicated result channel for this task
 	resultGrayChan := make(chan worker.Task[image.Image, image.Image], 100)
 
-	// Convert the received image to a concrete type that supports SubImage
 	rgbaImg, ok := img.(*image.RGBA)
 	if !ok {
-		// Convert to RGBA if it's not already in that format
 		bounds := img.Bounds()
 		rgbaImg = image.NewRGBA(bounds)
 		draw.Draw(rgbaImg, bounds, img, bounds.Min, draw.Src)
 	}
 
-	// Split the image into row chunks
 	bounds := img.Bounds()
 	totalRows := bounds.Max.Y - bounds.Min.Y
-	chunkSize := (totalRows + server.numWorkers - 1) / server.numWorkers // Rows per worker
+	chunkSize := (totalRows + server.numWorkers - 1) / server.numWorkers
 
-	// Dispatch grayscale tasks to treatment workers
 	for i := 0; i < server.numWorkers; i++ {
 		startY := bounds.Min.Y + i*chunkSize
 		endY := startY + chunkSize + overlapSize
@@ -220,16 +320,13 @@ func (server *Server) handleConnection(conn net.Conn, workerChannels workerChann
 			endY = bounds.Max.Y
 		}
 
-		// Define the sub-rectangle for this chunk
 		subBounds := image.Rect(bounds.Min.X, startY, bounds.Max.X, endY)
 
-		// Define a sub-image for the range of rows
 		subImage, ok := rgbaImg.SubImage(subBounds).(*image.RGBA)
 		if !ok {
 			log.Fatalf("SubImage cast failed: expected *image.RGBA")
 		}
 
-		// Create and submit a task for the subimage
 		task := worker.Task[image.Image, image.Image]{
 			Conn:       conn,
 			Input:      subImage,
@@ -255,14 +352,13 @@ func (server *Server) handleConnection(conn net.Conn, workerChannels workerChann
 				Function:   ApplyCannyEdgeDetectionWrapper,
 			}
 			workerChannels.imageChan <- task
-		case <-server.stopCtx.Done(): // Handle shutdown gracefully
+		case <-server.stopCtx.Done():
 			log.Println("Server is shutting down, closing connection.")
 			return
 		}
 	}
 	close(resultGrayChan)
 
-	// Wait for all results and assemble the full image
 	results := make([]*image.Gray, server.numWorkers)
 
 	for i := 0; i < server.numWorkers; i++ {
@@ -273,7 +369,7 @@ func (server *Server) handleConnection(conn net.Conn, workerChannels workerChann
 				return
 			}
 			results[i] = result.Output.(*image.Gray)
-		case <-server.stopCtx.Done(): // Handle shutdown gracefully
+		case <-server.stopCtx.Done():
 			log.Println("Server is shutting down, closing connection.")
 			return
 		}
@@ -325,13 +421,12 @@ func (server *Server) handleConnection(conn net.Conn, workerChannels workerChann
 				return
 			}
 			bfsResult = append(bfsResult, result.Output...)
-		case <-server.stopCtx.Done(): // Handle shutdown gracefully
+		case <-server.stopCtx.Done():
 			log.Println("Server is shutting down, closing connection.")
 			return
 		}
 	}
 	close(resultBfsChan)
-	fmt.Println(len(bfsResult))
 
 	resultFindQuadrilateralChan := make(chan worker.Task[[]geometry.Contour, geometry.ContourWithArea], 100)
 	for i := 0; i < numWorkers; i++ {
@@ -360,7 +455,7 @@ func (server *Server) handleConnection(conn net.Conn, workerChannels workerChann
 				return
 			}
 			findQuadrilateralResult = append(findQuadrilateralResult, result.Output)
-		case <-server.stopCtx.Done(): // Handle shutdown gracefully
+		case <-server.stopCtx.Done():
 			log.Println("Server is shutting down, closing connection.")
 			return
 		}
@@ -403,12 +498,9 @@ func GrayscaleWrapper(img image.Image) (image.Image, error) {
 	return imageUtils.Grayscale(img), nil
 }
 
-// todo : reformat code
-// run executes the workflow of the server: listening a file, receiving the file over the connection, treating the image, and sending the image back to client.
 func (server *Server) run() {
 	listener := server.listen()
 	defer func(listener net.Listener) {
-		// Handle listener closing gracefully
 		var opErr *net.OpError
 		if err := listener.Close(); err != nil && !(errors.As(err, &opErr) && !opErr.Temporary()) {
 			log.Fatalf("Unexpected error closing listener: %v", err)
@@ -417,7 +509,6 @@ func (server *Server) run() {
 
 	fmt.Println("The server is running... (Press Ctrl + C to stop)")
 
-	// Channels for managing concurrent workers
 	socketSemaphore := make(chan net.Conn, 5)
 	imageChan := make(chan worker.Task[image.Image, image.Image], 100)
 	bfsChan := make(chan worker.Task[image.Rectangle, []geometry.Contour], 100)
@@ -430,14 +521,12 @@ func (server *Server) run() {
 		findQuadrilateralChan: findQuadrilateralChan,
 	}
 
-	// Start worker pools
 	go worker.StartWorkerPool("Image Worker", numWorkers, worker.TreatmentWorker, imageChan)
 	go worker.StartWorkerPool("BFS worker", numWorkers, worker.TreatmentWorker, bfsChan)
 	go worker.StartWorkerPool("FindQuadrilateral worker", numWorkers, worker.TreatmentWorker, findQuadrilateralChan)
 
-	// Use a goroutine to listen for server stop signals
 	go func() {
-		<-server.stopCtx.Done() // Wait for cancellation
+		<-server.stopCtx.Done()
 		log.Println("Shutting down server...")
 		err := listener.Close()
 		if err != nil {
@@ -455,19 +544,17 @@ func (server *Server) run() {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			// Special case: listener.Closed() produces `use of closed network connection` error
 			var opErr *net.OpError
 			if errors.As(err, &opErr) && !opErr.Temporary() {
 				log.Println("Listener has been closed. Stopping server gracefully.")
 				return
 			}
-			// Other errors
 			log.Printf("Error accepting connection: %v", err)
 			continue
 		}
 
 		select {
-		case <-server.stopCtx.Done(): // Stop if shutdown signal received
+		case <-server.stopCtx.Done():
 			log.Println("Server is shutting down, closing new connection.")
 			conn.Close()
 		default:
@@ -476,9 +563,7 @@ func (server *Server) run() {
 	}
 }
 
-// main initialize the functionality of a TCP server.
 func main() {
-	// Open a file for logging
 	logFile, err := os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
 	if err != nil {
 		log.Fatalf("Failed to open log file: %v", err)
@@ -490,7 +575,6 @@ func main() {
 		}
 	}(logFile)
 
-	// Set the output of the default logger to the file
 	log.SetOutput(logFile)
 
 	log.Println("Starting server...")
@@ -501,9 +585,9 @@ func main() {
 	signal.Notify(signalChan, os.Interrupt)
 
 	go func() {
-		<-signalChan // Wait for signal
+		<-signalChan
 		log.Println("Interrupt signal received.")
-		server.cancel() // Signal server to stop
+		server.cancel()
 	}()
 
 	server.run()

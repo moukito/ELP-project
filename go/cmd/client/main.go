@@ -1,5 +1,151 @@
 package main
 
+/*
+Package main implements a TCP client for sending and receiving image files to/from a server.
+The client connects to a specified server, sends an image file,
+and then receives a processed image from the server, saving it locally.
+
+---
+
+### Key Features
+- **Server Connection**:
+  - Connects to a TCP server for communication.
+  - Default server address is `localhost:14750`.
+- **Image File Transmission**:
+  - Sends an image file to the server using a buffered approach.
+  - Receives the processed image file from the server and saves it locally.
+- **Dynamic File Handling**:
+  - If a file with the same output name exists, generates a new name to avoid overwriting.
+
+---
+
+### Constants
+
+- `defaultHost`: The default hostname of the server (`"localhost"`).
+- `defaultPort`: The default port of the server (`"14750"`).
+- `bufferSize`: Buffer size (in bytes) used for reading/writing data (`1024`).
+
+---
+
+### Types
+
+#### `Client`
+Defines the TCP client for communication with the server.
+
+- **Fields**:
+  - `host string`: The server's hostname.
+  - `port string`: The server's port.
+
+- **Methods**:
+  - `connect() net.Conn`: Establishes a connection to the server and returns the connection object.
+  - `sendImage(file *os.File, conn net.Conn)`: Sends the specified image file to the server.
+  - `receiveImage(conn net.Conn, file *os.File)`: Receives the processed image from the server and saves it locally.
+  - `run(imageFilePath string)`: Coordinates the process of connecting, sending, and receiving.
+
+---
+
+### Functions
+
+#### `newClient(host string, port string) *Client`
+Creates and initializes a new instance of `Client`.
+
+- **Parameters**:
+  - `host string`: Hostname of the server.
+  - `port string`: Port of the server.
+- **Returns**:
+  - A pointer to a new `Client` instance.
+
+#### `Client.connect() net.Conn`
+Connects to the specified server and returns the established connection.
+
+- **Panics**:
+  - If the connection fails.
+
+#### `Client.sendImage(file *os.File, conn net.Conn)`
+Sends the given image file to the server using the specified connection.
+
+- **Parameters**:
+  - `file *os.File`: The file object of the image to send.
+  - `conn net.Conn`: The connection object.
+
+#### `Client.receiveImage(conn net.Conn, file *os.File)`
+Receives a file from the server and writes it to the specified file object.
+
+- **Parameters**:
+  - `conn net.Conn`: The connection object.
+  - `file *os.File`: The output file object where data is written.
+
+---
+
+### Main Functionality
+
+#### `main()`
+The entry point of the application.
+
+- **Behavior**:
+  - Validates command-line arguments to ensure proper usage.
+  - Parses the image file path and (optionally) the server address from arguments.
+  - Creates a `Client` instance and manages the workflow:
+    1. Opens the image file.
+    2. Connects to the server.
+    3. Sends the image to the server.
+    4. Receives the processed image from the server and saves it with an appropriate name.
+  - Logs all activities to the file `client.log`.
+
+---
+
+### Example Usage
+```bash
+# Run the client with the image file and optional server address
+./client path/to/image.png localhost:14750
+```
+
+---
+
+### Workflow Steps
+1. **Initialization**:
+   - The client accepts an image file path and an optional server address as command-line arguments.
+   - If the server address is not provided, the default address (`localhost:14750`) is used.
+2. **Connection**:
+   - Establishes a TCP connection to the server.
+3. **Data Transmission**:
+   - Reads the image file in chunks of `bufferSize` bytes and sends it to the server.
+   - A special "EOF" marker is sent to indicate the end of the file.
+4. **Receiving Processed Image**:
+   - Reads the processed image data from the server and writes it to a local file.
+   - If the output file already exists, a new filename is generated to avoid overwriting.
+5. Logs all activities (including errors) to a log file named `client.log`.
+
+---
+
+### File Handling
+- The client ensures proper cleanup:
+  - Opens files for reading or writing.
+  - Closes files and network connections gracefully on completion or error.
+
+---
+
+### Error Handling
+- Handles network errors (e.g., connection failures, data transmission errors) and file I/O errors.
+- Ensures proper logging of all encountered errors.
+
+---
+
+### Example Workflow in Code
+```go
+func main() {
+    // Parse arguments
+    imageFilePath := "example.png"
+    host := "localhost"
+    port := "14750"
+
+    // Create a new client
+    client := newClient(host, port)
+    client.run(imageFilePath)
+}
+```
+*/
+
 import (
 	"fmt"
 	"io"
@@ -15,13 +161,11 @@ const (
 	bufferSize  = 1024
 )
 
-// Client is a struct that encapsulates the functionality for sending files over a TCP connection.
 type Client struct {
 	host string
 	port string
 }
 
-// newClient creates a new Client instance with the given image file path and server address.
 func newClient(host string, port string) *Client {
 	return &Client{
 		host: host,
@@ -29,7 +173,6 @@ func newClient(host string, port string) *Client {
 	}
 }
 
-// connect establishes a TCP connection to the server.
 func (client *Client) connect() net.Conn {
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", client.host, client.port))
 	if err != nil {
@@ -39,7 +182,6 @@ func (client *Client) connect() net.Conn {
 	return conn
 }
 
-// sendImage sends the image file to the server using the given connection.
 func (client *Client) sendImage(file *os.File, conn net.Conn) {
 	buffer := make([]byte, bufferSize)
 
@@ -66,18 +208,14 @@ func (client *Client) sendImage(file *os.File, conn net.Conn) {
 }
 
 func (client *Client) receiveImage(conn net.Conn, file *os.File) {
-	// Create a buffer to store the incoming data
-	buffer := make([]byte, bufferSize) // Temporary buffer size for chunks
+	buffer := make([]byte, bufferSize)
 
 	for {
-		// Read incoming data into the temporary buffer
 		n, err := conn.Read(buffer)
 		if err != nil {
 			if err.Error() == "EOF" || err == io.EOF {
-				// End of data, break the loop
 				break
 			}
-			// Handle unexpected errors
 			log.Fatalf("Error reading from connection: %v", err)
 		}
 
@@ -88,9 +226,7 @@ func (client *Client) receiveImage(conn net.Conn, file *os.File) {
 	}
 }
 
-// run executes the workflow of the client: opening a file, connecting, and sending the file.
 func (client *Client) run(imageFilePath string) {
-	// Open image file
 	file, err := os.Open(imageFilePath)
 	if err != nil {
 		log.Fatalf("error opening image file: %v", err)
@@ -103,7 +239,6 @@ func (client *Client) run(imageFilePath string) {
 		}
 	}(file)
 
-	// Connect to server
 	conn := client.connect()
 	log.Printf("Connected to server: %s", conn.RemoteAddr().String())
 	defer func(conn net.Conn) {
@@ -143,9 +278,7 @@ func (client *Client) run(imageFilePath string) {
 	client.receiveImage(conn, newFile)
 }
 
-// main initializes the process of reading an image file and sending it over a TCP connection to a server.
 func main() {
-	// Open a file for logging
 	logFile, err := os.OpenFile("client.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
 	if err != nil {
 		log.Fatalf("Failed to open log file: %v", err)
@@ -157,7 +290,6 @@ func main() {
 		}
 	}(logFile)
 
-	// Set the output of the default logger to the file
 	log.SetOutput(logFile)
 
 	args := os.Args
@@ -182,7 +314,6 @@ func main() {
 	}
 	log.Printf("Server address: %s:%s", host, port)
 
-	// Create and run the client
 	client := newClient(host, port)
 	client.run(imageFilePath)
 }
