@@ -6,3 +6,4 @@ bin
 .idea
 *.log
 elm-stuff
+/elm/js/Main.js
