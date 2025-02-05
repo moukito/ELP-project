@@ -1,8 +1,65 @@
 # ELP-project
 
+Ce projet contient trois sous-projets écrits dans différents langages de programmation :
+
+
+1. [Projet ELM](#elm)
+2. [projet Go](#go)
+3. [Projet Javascript](#javascript)
+
+---
+
 ## ELM
 
+### Description
+
+Le but de ce projet est de créer un langage TcTurtle qui permet à un utilisateur d'écrire un programme et de pourvoir ensuite observer le résultat directement.
+
+### Installation
+1. **Cloner le projet**
+   ```shell
+   git clone https://github.com/moukito/ELP-project.git
+   cd ELP-project/elm
+   ```
+2. **Compiler le projet**
+   ```shell
+   elm make src/Main.elm --output Main.js
+   ```
+3. **Lancer le site web**
+   Sous Linux/MacOS :
+   ```shell
+   open index.html
+   ```
+   Sous Windows :
+   ```shell
+   start index.html
+   ```
+
+---
+
 ## GO
+
+### Description
+
+Ce projet met en place un serveur tcp qui permet alors à différents clients d'envoyer une image qu'il souhaite numériser. L'image est alors traiter sur le serveur et renvoyé au client.
+
+### Installation et Exécution
+1. **Cloner le projet**
+   ```shell
+   git clone https://github.com/moukito/ELP-project.git
+   cd ELP-project/go
+   ```
+
+2. **Compiler et exécuter**
+   Compilez et exécutez l'application en utilisant les commandes Go :
+   ```shell
+   go build -o main main.go
+   ./main
+   ```
+
+   Remarque : Assurez-vous d'avoir [Go](https://golang.org/) installé sur votre machine.
+
+---
 
 ## Javascript
 
@@ -31,6 +88,6 @@ C'est un jeu coopératif où les joueurs doivent faire deviner un mot mystère e
    npm install
    ```
 3. **Lancer le jeu**
-    ```shell
-    node ./src/main.js
-    ```
+   ```shell
+   npm start
+   ```
