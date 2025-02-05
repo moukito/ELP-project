@@ -4,8 +4,7 @@
   "description": "Jeu Just One en Node.js, jouable dans le terminal.",
   "main": "src/main.js",
   "scripts": {
-    "start": "node src/main.js",
-    "test": "echo \"Aucun test défini pour le moment\" && exit 0" // todo
+    "start": "node src/main.js"
   },
   "keywords": [
     "jeu",
@@ -13,6 +12,5 @@
     "terminal",
     "nodejs"
   ],
-  "author": "Ton Nom", // todo
-  "license": "MIT" // todo
+  "author": "Théo Frémont et Yuye Zhong"
 }
