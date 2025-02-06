@@ -26,11 +26,11 @@ Le but de ce projet est de créer un langage TcTurtle qui permet à un utilisate
    elm make src/Main.elm --output Main.js
    ```
 3. **Lancer le site web**
-   Sous Linux/MacOS :
+   - Sous Linux/MacOS :
    ```shell
    open index.html
    ```
-   Sous Windows :
+   - Sous Windows :
    ```shell
    start index.html
    ```
