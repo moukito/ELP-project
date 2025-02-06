@@ -2,9 +2,11 @@
   "name": "just-one-game",
   "version": "1.0.0",
   "description": "Jeu Just One en Node.js, jouable dans le terminal.",
-  "main": "main.js",
+  "main": "src/main.js",
   "scripts": {
-    "start": "node main.js"
+    "start": "node src/main.js",
+    "start-server": "node src/server.js",
+    "start-client": "node src/client.js"
   },
   "keywords": [
     "jeu",

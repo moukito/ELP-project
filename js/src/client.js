@@ -1,13 +1,20 @@
 // src/client.js
 const net = require('net');
-const { createInterface, askQuestion } = require('./utils');
+const readline = require('readline');
 
 const port = 3000;
-const host = 'localhost'; // À modifier si nécessaire
+const host = 'localhost'; // Modifier si le serveur est sur une autre machine
 
-const rl = createInterface();
+// Création de l'interface readline pour saisir les réponses du joueur
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
+
+// Variable pour mémoriser le nom du joueur
 let playerName = null;
 
+// Connexion au serveur
 const client = net.createConnection({ port, host }, () => {
     console.log("Connecté au serveur.");
     askForName();
@@ -15,17 +22,20 @@ const client = net.createConnection({ port, host }, () => {
 
 client.setEncoding('utf8');
 
+// Envoi d'un message JSON au serveur
 function sendMessage(message) {
     client.write(JSON.stringify(message) + "\n");
 }
 
+// Demande le nom du joueur et envoie la requête de connexion
 function askForName() {
-    askQuestion(rl, "Entrez votre nom: ").then(name => {
+    rl.question("Entrez votre nom: ", (name) => {
         playerName = name.trim() || "Joueur";
         sendMessage({ type: "join", payload: { name: playerName } });
     });
 }
 
+// Écoute les messages du serveur
 client.on('data', (data) => {
     data.split('\n').forEach(raw => {
         if (!raw.trim()) return;
@@ -47,20 +57,23 @@ function handleMessage(message) {
             console.log(message.payload.message);
             break;
         case "mystery_word":
+            // Pour les joueurs passifs, afficher le mot mystère
             console.log(`Mot mystère: ${message.payload.word}`);
             break;
         case "active_notice":
             console.log(message.payload.message);
             break;
         case "ask_index":
-            askQuestion(rl, "Donne ton indice: ").then(index => {
+            // Le serveur demande à ce joueur (passif) son indice
+            rl.question("Donne ton indice: ", (index) => {
                 sendMessage({ type: "index", payload: { name: playerName, index } });
             });
             break;
         case "indices":
+            // Pour le joueur actif, affichage des indices validés
             console.log("Indices validés par tes coéquipiers:");
             console.log(message.payload.validIndices);
-            askQuestion(rl, "Fais ta proposition: ").then(guess => {
+            rl.question("Fais ta proposition: ", (guess) => {
                 sendMessage({ type: "guess", payload: { name: playerName, guess } });
             });
             break;
