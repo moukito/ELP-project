@@ -4,15 +4,13 @@ class Players {
      */
     constructor(names) {
         this.list = names;
-        this.currentIndex = 0; // Indice du joueur actif
+        this.currentIndex = 0;
     }
 
-    // Retourne le joueur actif
     getActivePlayer() {
         return this.list[this.currentIndex];
     }
 
-    // Passe le tour au joueur suivant
     rotate() {
         this.currentIndex = (this.currentIndex + 1) % this.list.length;
     }
