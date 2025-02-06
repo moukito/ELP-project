@@ -1,9 +1,19 @@
+/**
+ * @file client.js
+ * @description Gère le client du jeu Just One en mode multi-terminal.
+ * Ce module permet à un joueur de se connecter au serveur, d’envoyer et de recevoir des messages.
+ * Il affiche les informations nécessaires à chaque joueur et interagit avec le serveur via TCP.
+ */
+
 const net = require('net');
 const readline = require('readline');
 
 const port = 3000;
 const host = 'localhost';
 
+/**
+ * Interface readline pour gérer l’entrée utilisateur dans le terminal.
+ */
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
@@ -11,6 +21,10 @@ const rl = readline.createInterface({
 
 let playerName = null;
 
+/**
+ * Initialise la connexion au serveur.
+ * Dès la connexion, il demande au joueur de renseigner son nom.
+ */
 const client = net.createConnection({ port, host }, () => {
     console.log("Connecté au serveur.");
     askForName();
@@ -18,10 +32,17 @@ const client = net.createConnection({ port, host }, () => {
 
 client.setEncoding('utf8');
 
+/**
+ * Envoie un message au serveur sous forme de JSON.
+ * @param {Object} message - Objet contenant le type de message et les données associées.
+ */
 function sendMessage(message) {
     client.write(JSON.stringify(message) + "\n");
 }
 
+/**
+ * Demande au joueur de saisir son nom et l'envoie au serveur.
+ */
 function askForName() {
     rl.question("Entrez votre nom: ", (name) => {
         playerName = name.trim() || "Joueur";
@@ -29,6 +50,9 @@ function askForName() {
     });
 }
 
+/**
+ * Gère la réception des messages du serveur et déclenche les actions appropriées.
+ */
 client.on('data', (data) => {
     data.split('\n').forEach(raw => {
         if (!raw.trim()) return;
@@ -41,6 +65,10 @@ client.on('data', (data) => {
     });
 });
 
+/**
+ * Analyse les messages reçus du serveur et agit en conséquence.
+ * @param {Object} message - Objet contenant le type du message et ses données.
+ */
 function handleMessage(message) {
     switch (message.type) {
         case "join_ack":
@@ -85,6 +113,9 @@ function handleMessage(message) {
     }
 }
 
+/**
+ * Gère la déconnexion du client.
+ */
 client.on('close', () => {
     console.log("Déconnecté du serveur.");
     process.exit(0);

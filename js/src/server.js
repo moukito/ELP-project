@@ -1,7 +1,19 @@
+/**
+ * @file server.js
+ * @description Gère le serveur du jeu Just One en mode multi-terminal.
+ * Ce module crée un serveur TCP permettant aux joueurs de se connecter, de recevoir des mots mystères,
+ * d'envoyer des indices et de deviner le mot. Le serveur gère la logique du jeu et la communication entre les joueurs.
+ */
+
 const net = require('net');
 const readline = require('readline');
 const Words = require('./words');
 
+/**
+ * Mélange un tableau de manière aléatoire (algorithme de Fisher-Yates).
+ * @param {Array} array - Tableau à mélanger.
+ * @returns {Array} - Tableau mélangé.
+ */
 function shuffle(array) {
     let currentIndex = array.length, temporaryValue, randomIndex;
     while (currentIndex !== 0) {
@@ -14,17 +26,26 @@ function shuffle(array) {
     return array;
 }
 
+/**
+ * Crée une interface readline pour gérer l'entrée utilisateur sur le terminal du serveur.
+ */
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
 });
 
+/**
+ * Pose une question à l'utilisateur et retourne sa réponse.
+ * @param {string} query - Texte de la question.
+ * @returns {Promise<string>} - Réponse de l'utilisateur.
+ */
 function askQuestion(query) {
     return new Promise(resolve => {
         rl.question(query, resolve);
     });
 }
 
+// Liste des joueurs connectés
 const players = [];
 let hostPlayer = null;
 
@@ -38,6 +59,11 @@ let discarded = [];
 let currentRoundWord = null;
 let roundResponses = {};
 
+/**
+ * Envoie un message à un joueur spécifique.
+ * @param {Object} player - Objet représentant le joueur ({ name, socket, isHost }).
+ * @param {Object} message - Objet JSON contenant le type et les données du message.
+ */
 function sendToPlayer(player, message) {
     if (player.isHost) {
         console.log(`\n[Message pour ${player.name} - HOST] ${message.type}:`, message.payload);
@@ -46,10 +72,18 @@ function sendToPlayer(player, message) {
     }
 }
 
+/**
+ * Diffuse un message à tous les joueurs connectés.
+ * @param {Object} message - Objet JSON contenant le type et les données du message.
+ */
 function broadcast(message) {
     players.forEach(player => sendToPlayer(player, message));
 }
 
+/**
+ * Démarre un tour de jeu, choisit un joueur actif, distribue le mot mystère aux autres joueurs
+ * et demande les indices.
+ */
 async function playRound() {
     if (wordsDeck.length === 0) {
         console.log("Plus de mots dans le deck. Fin de la partie.");
@@ -86,6 +120,10 @@ async function playRound() {
     });
 }
 
+/**
+ * Vérifie les indices fournis par les joueurs passifs, élimine les doublons et envoie les indices validés au joueur actif.
+ * @param {Object} activePlayer - Joueur actif du tour.
+ */
 function checkIndices(activePlayer) {
     const expectedCount = players.filter(p => p !== activePlayer).length;
     if (Object.keys(roundResponses).length < expectedCount) return;
@@ -110,6 +148,11 @@ function checkIndices(activePlayer) {
     }
 }
 
+/**
+ * Vérifie la proposition du joueur actif et met à jour les scores.
+ * @param {Object} activePlayer - Joueur actif qui a fait une proposition.
+ * @param {string} guess - Proposition du joueur.
+ */
 function processGuess(activePlayer, guess) {
     if (guess === currentRoundWord.trim().toLowerCase()) {
         console.log("Bonne réponse !");
@@ -124,6 +167,9 @@ function processGuess(activePlayer, guess) {
     setTimeout(playRound, 1000);
 }
 
+/**
+ * Configure le serveur et attend la connexion des joueurs.
+ */
 async function setupServer() {
     const numPlayersStr = await askQuestion("Nombre total de joueurs (y compris toi) : ");
     totalPlayers = parseInt(numPlayersStr);
@@ -144,8 +190,12 @@ async function setupServer() {
     });
 }
 
+// Création du serveur TCP
 const server = net.createServer();
 
+/**
+ * Gère la connexion d'un nouveau joueur.
+ */
 server.on('connection', (socket) => {
     console.log("Un joueur distant vient de se connecter.");
     socket.setEncoding('utf8');
@@ -167,6 +217,11 @@ server.on('connection', (socket) => {
     });
 });
 
+/**
+ * Gère les messages reçus des clients et effectue les actions appropriées.
+ * @param {Object} socket - Socket du client.
+ * @param {Object} message - Message JSON reçu.
+ */
 function handleClientMessage(socket, message) {
     if (message.type === "join") {
         const playerName = message.payload.name;
@@ -181,18 +236,14 @@ function handleClientMessage(socket, message) {
             playRound();
         }
     } else if (message.type === "index") {
-        const playerName = message.payload.name;
-        const indexText = message.payload.index;
-        roundResponses[playerName] = indexText.trim().toLowerCase();
-        const activePlayer = players[currentRound % players.length];
-        checkIndices(activePlayer);
+        roundResponses[message.payload.name] = message.payload.index.trim().toLowerCase();
+        checkIndices(players[currentRound % players.length]);
     } else if (message.type === "guess") {
-        const playerName = message.payload.name;
-        const guess = message.payload.guess.trim().toLowerCase();
-        processGuess({ name: playerName, isHost: false }, guess);
+        processGuess(players[currentRound % players.length], message.payload.guess.trim().toLowerCase());
     }
 }
 
+// Initialisation du serveur
 (async function init() {
     await setupServer();
 })();

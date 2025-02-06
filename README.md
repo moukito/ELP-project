@@ -87,7 +87,11 @@ C'est un jeu coopératif où les joueurs doivent faire deviner un mot mystère e
    ```shell
    npm install
    ```
-3. **Lancer le jeu**
+3. **Lancer le serveur**
    ```shell
-   npm start
+   npm start-server
    ```
+4. **Lancer le client**
+   ```shell
+    npm start-client
+    ```
