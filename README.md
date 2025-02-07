@@ -89,9 +89,9 @@ C'est un jeu coopératif où les joueurs doivent faire deviner un mot mystère e
    ```
 3. **Lancer le serveur**
    ```shell
-   npm start-server
+   npm run start-server
    ```
 4. **Lancer le client**
    ```shell
-    npm start-client
+    npm run start-client
     ```
